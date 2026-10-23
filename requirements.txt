@@ -4,3 +4,6 @@ uvicorn
 httpx
 numpy
 statsmodels
+pandas
+lightgbm
+scikit-learn

@@ -36,7 +36,7 @@ TOP_MAX_DESVIO = 0.35  # preço 24h até ~30% abaixo/acima da mediana de 7 dias
 NOMES = ["momento_curto", "momento_24h", "volume", "desvio"]
 
 
-def carregar_series(con, regiao=None, ate=None):
+def carregar_series(con, regiao=None, ate=None, itens=None):
     """Devolve {(regiao, item, local): (precos[], volumes[], t0)} em grade de 6h."""
     ate = ate or int(time.time())
     # O bloco atual ainda está incompleto, então fica de fora
@@ -47,6 +47,12 @@ def carregar_series(con, regiao=None, ate=None):
     if regiao:
         sql += " AND regiao=?"
         args.append(regiao)
+    if itens:
+        # O "+" impede o SQLite de usar o índice (regiao, escala, ts), que varre
+        # a região inteira; assim ele usa a chave primária (regiao, item, ...)
+        sql = sql.replace("escala=", "+escala=").replace("ts<=", "+ts<=")
+        sql += f" AND item IN ({','.join('?' * len(itens))})"
+        args.extend(itens)
     brutos = defaultdict(dict)
     for r, item, loc, ts, q, p in con.execute(sql, args):
         if q > 0:

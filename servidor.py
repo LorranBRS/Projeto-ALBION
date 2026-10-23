@@ -734,3 +734,14 @@ def aquecer_previsao():
                 print(f"Previsão de {r} indisponível: {e}")
 
     threading.Thread(target=aquecer, daemon=True).start()
+
+
+# --- módulo preditivo v2 (/api/v1) ---------------------------------------------
+from backend.api import routes as rotas_v1  # noqa: E402
+
+app.include_router(rotas_v1.router)
+
+
+@app.on_event("startup")
+def aquecer_sinais():
+    rotas_v1.aquecer()

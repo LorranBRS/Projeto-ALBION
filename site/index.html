@@ -153,6 +153,22 @@ tr.melhor td { background: var(--accent-soft); }
 .sinal.vender { background: color-mix(in srgb, var(--down) 18%, transparent); color: var(--down); }
 .sinal.aguardar, .sinal.sem { background: var(--bg); color: var(--muted); }
 
+/* Sinais do modelo (v2) */
+.selo-sinal { display: inline-block; font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; letter-spacing: .02em; white-space: nowrap; }
+.selo-sinal.COMPRA { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
+.selo-sinal.VENDA { background: color-mix(in srgb, var(--down) 18%, transparent); color: var(--down); }
+.selo-sinal.NEUTRO { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.zscore { font-size: 1rem; margin: 6px 0; }
+.zscore b { font-variant-numeric: tabular-nums; }
+.serie svg { width: 100%; height: 220px; display: block; }
+.serie .linha { fill: none; stroke: var(--accent); stroke-width: 2; }
+.serie .faixa95 { fill: var(--accent); opacity: .12; }
+.serie .faixa80 { fill: var(--accent); opacity: .25; }
+.serie .prev { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
+.serie .eixo { fill: var(--muted); font-size: 10px; }
+.serie .grade { stroke: var(--line); }
+.serie .agora { stroke: var(--muted); stroke-dasharray: 3 3; }
+
 /* Previsão no topo */
 .previsao { margin: 10px 0 4px; }
 .previsao h2 { font-size: .95rem; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
@@ -245,6 +261,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <button class="aba" data-aba="agora" aria-pressed="false">Movimento agora</button>
     <button class="aba" data-aba="comparar" aria-pressed="false">Comparar mercados</button>
     <button class="aba" data-aba="ciclos" aria-pressed="false">Ciclos semanais</button>
+    <button class="aba" data-aba="fabricar" aria-pressed="false">Oportunidades de fabricação</button>
     <button class="aba bm" data-aba="negro" aria-pressed="false">Mercado Negro</button>
   </div>
   <p class="explica" id="explica"></p>
@@ -310,10 +327,12 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <div class="det-abas" role="group" aria-label="Detalhe">
       <button class="aba" data-det="mercado" aria-pressed="true">Mercado</button>
       <button class="aba" data-det="craft" aria-pressed="false">Fabricação</button>
+      <button class="aba" data-det="previsao" aria-pressed="false">Previsão</button>
       <button class="aba" data-det="ciclo" aria-pressed="false">Ciclo semanal</button>
     </div>
     <div id="det-mercado"></div>
     <div id="det-craft" hidden></div>
+    <div id="det-previsao" hidden></div>
     <div id="det-ciclo" hidden></div>
   </div>
 </dialog>
@@ -355,6 +374,9 @@ const ABAS = {
   },
   ciclos: {
     texto: "Insumos com ciclo semanal de preço: quando costuma ser o fundo (comprar) e o pico (vender). Curva extraída por decomposição STL das últimas 4 semanas; previsão por Holt-Winters.",
+  },
+  fabricar: {
+    texto: "Itens cuja venda paga mais de 15% acima do custo teórico de fabricação (materiais na cidade mais barata, já com o retorno de recursos da melhor cidade, sem foco e sem a taxa da estação). Ordenados pelo insumo mais abaixo da média (menor z-score).",
   },
   negro: {
     texto: "Os 5 itens mais em alta no Mercado Negro (Caerleon): o que os NPCs estão comprando acima do normal nas últimas 24h.",
@@ -469,8 +491,11 @@ async function carregar() {
       obterComparacao(),
     ]);
     estado.dados = dados; estado.negro = negro; estado.comparacao = comparacao;
+    if (estado.oportunidades && estado.oportunidadesRegiao !== estado.regiao) estado.oportunidades = null;
+    estado.oportunidadesRegiao = estado.regiao;
     carregarPrevisao();
     carregarBonus();
+    carregarSinais();
     await carregarCiclos();
     const hora = new Date(dados.gerado_em * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"});
     $("status").textContent = `${dados.itens.length.toLocaleString("pt-BR")} itens com vendas nas últimas 24h · ${dados.picos_descartados.toLocaleString("pt-BR")} picos de preço fora do padrão ignorados · atualizado às ${hora}`;
@@ -531,6 +556,7 @@ async function carregarPrevisao() {
       <img src="${icone(i.id)}" alt="">
       <b>${esc(i.nome)}</b>
       <div class="tag">${tierTxt(i)} · ${esc(i.cidade)}</div>
+      ${seloModelo(i.id, true)}
       <div class="prev-alta">+${i.alta_prevista.toLocaleString("pt-BR")}%<small>previsto</small></div>
       <div class="prev-precos">${fmt(i.preco_atual)} → <b>${fmt(i.preco_previsto)}</b></div>
       <div class="prev-motivos">${i.motivos.map(esc).join("<br>")}</div>
@@ -576,7 +602,7 @@ let esperaBusca;
 $("busca").addEventListener("input", () => {
   clearTimeout(esperaBusca);
   const q = $("busca").value.trim();
-  if (estado.aba === "comparar" || estado.aba === "ciclos" || q.length < 2) { estado.busca = null; desenhar(); return; }
+  if (["comparar", "ciclos", "fabricar"].includes(estado.aba) || q.length < 2) { estado.busca = null; desenhar(); return; }
   esperaBusca = setTimeout(async () => {
     try {
       const achados = await obter(`/api/busca?q=${encodeURIComponent(q)}&limite=100`);
@@ -617,11 +643,35 @@ function aplicarFiltros(lista, { recente = true } = {}) {
     .filter(i => !recente || i.ultima_venda == null || i.ultima_venda >= limite);
 }
 
+const TXT_SELO = {COMPRA: "Oportunidade de compra", VENDA: "Hora de vender", NEUTRO: "Estável"};
+function sinalDoItem(id) {
+  const lista = estado.sinais && estado.sinais[id];
+  if (!lista || !lista.length) return null;
+  const cidade = estado.cidade ? Number(estado.cidade) : null;
+  return (cidade != null && lista.find(x => x.local === cidade)) || lista[0];
+}
+function seloModelo(id, sempre = true) {
+  const s = sinalDoItem(id);
+  if (!s || !TXT_SELO[s.sinal] || (s.sinal === "NEUTRO" && !sempre)) return "";
+  return `<span class="selo-sinal ${s.sinal}" title="${esc(s.cidade || "")} · z-score ${s.z_score_14d ?? "–"}">${TXT_SELO[s.sinal]}</span>`;
+}
+function textoZ(z) {
+  if (z == null) return "sem histórico suficiente para o z-score";
+  const abs = Math.abs(z).toLocaleString("pt-BR", {maximumFractionDigits: 1});
+  if (Math.abs(z) < 0.5) return `preço praticamente na média dos últimos 14 dias (${z > 0 ? "+" : ""}${z.toLocaleString("pt-BR")} desvio padrão)`;
+  return `preço <b>${abs} desvios padrão ${z < 0 ? "abaixo" : "acima"}</b> da média dos últimos 14 dias`;
+}
+async function carregarSinais() {
+  try { estado.sinais = (await obter(`/api/v1/signals?regiao=${estado.regiao}`)).itens; }
+  catch (e) { estado.sinais = null; }
+  desenhar();
+}
+
 function linhaTabela(i, n, colunas) {
   const sub = [tierTxt(i), i.ultima_venda ? `última venda ${tempoAtras(i.ultima_venda)}` : "sem vendas recentes"].filter(Boolean).join(" · ");
   return `<tr data-id="${esc(i.id)}">
     <td class="pos num">${n + 1}</td>
-    <td><div class="item"><img loading="lazy" src="${icone(i.id)}" alt=""><div><b>${esc(i.nome)}</b><div class="tag">${sub}</div></div></div></td>
+    <td><div class="item"><img loading="lazy" src="${icone(i.id)}" alt=""><div><b>${esc(i.nome)}</b>${seloModelo(i.id)}<div class="tag">${sub}</div></div></div></td>
     ${colunas.map(c => `<td class="num">${COLUNAS[c][1](i[c])}</td>`).join("")}
   </tr>`;
 }
@@ -661,7 +711,7 @@ function desenharNegro() {
         <div class="topo">
           <span class="pos">${n + 1}</span>
           <img src="${icone(i.id)}" alt="">
-          <div><b>${esc(i.nome)}</b><div class="tag">${tierTxt(i)}</div></div>
+          <div><b>${esc(i.nome)}</b><div class="tag">${tierTxt(i)}</div>${seloModelo(i.id, true)}</div>
         </div>
         <dl>
           <dt>Vendas 24h</dt><dd>${fmt(i.vendas_24h)}</dd>
@@ -683,9 +733,10 @@ function desenhar() {
   $("comparar").hidden = !comparar;
   const ciclosAba = estado.aba === "ciclos";
   $("ciclos-ctrl").hidden = !ciclosAba;
-  $("recente").hidden = ciclosAba || comparar;
+  $("recente").hidden = ciclosAba || comparar || estado.aba === "fabricar";
   if (comparar) return desenharComparacao();
   if (ciclosAba) return desenharCiclos();
+  if (estado.aba === "fabricar") return desenharOportunidades();
   if (estado.busca) return desenharBusca();
   if (negro) return desenharNegro();
 
@@ -718,6 +769,7 @@ function trocarAbaDetalhe(qual) {
   $("det-mercado").hidden = qual !== "mercado";
   $("det-craft").hidden = qual !== "craft";
   $("det-ciclo").hidden = qual !== "ciclo";
+  $("det-previsao").hidden = qual !== "previsao";
 }
 
 async function abrirItem(id) {
@@ -731,6 +783,7 @@ async function abrirItem(id) {
   dlg.showModal();
   carregarCraft(id);
   carregarCicloItem(id);
+  carregarPrevisaoItem(id);
   let d;
   try { d = await obter(`/api/item/${estado.regiao}/${encodeURIComponent(id)}`); }
   catch (e) { $("det-nome").textContent = "Não foi possível carregar o item."; return; }
@@ -855,6 +908,101 @@ function desenharCraft() {
   $("usar-foco").addEventListener("change", e => {
     estado.usarFoco = e.target.checked; guardar("usarFoco", e.target.checked ? "1" : "0"); desenharCraft();
   });
+}
+
+/* ---------- previsão do modelo (v2) ---------- */
+function graficoSerie(d) {
+  const hist = d.historico;
+  if (!hist.length) return `<p class="sub">Sem histórico recente para o gráfico.</p>`;
+  const t0 = hist[0].ts, tAgora = d.ts, t12 = tAgora + 12 * 3600, t24 = tAgora + 24 * 3600;
+  const valores = [...hist.map(p => p.preco), d.price_pred_lower_95, d.price_pred_upper_95,
+                   d.price_pred_24h_lower_95, d.price_pred_24h_upper_95].filter(v => v != null);
+  const min = Math.min(...valores), max = Math.max(...valores), faixa = (max - min) || 1;
+  const W = 700, H = 220, esq = 50, dir = 10, topo = 10, base = 190;
+  const x = t => esq + (t - t0) / (t24 - t0) * (W - esq - dir);
+  const y = v => base - (v - min) / faixa * (base - topo);
+  const linha = hist.map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.preco).toFixed(1)}`).join(" ");
+  const pAtual = d.preco_atual;
+  const area = (lo0, lo12, lo24, hi0, hi12, hi24) =>
+    `M${x(tAgora)},${y(lo0)} L${x(t12)},${y(lo12)} L${x(t24)},${y(lo24)} L${x(t24)},${y(hi24)} L${x(t12)},${y(hi12)} L${x(tAgora)},${y(hi0)} Z`;
+  const f95 = area(pAtual, d.price_pred_lower_95, d.price_pred_24h_lower_95, pAtual, d.price_pred_upper_95, d.price_pred_24h_upper_95);
+  const f80 = area(pAtual, d.price_pred_lower, d.price_pred_24h_lower, pAtual, d.price_pred_upper, d.price_pred_24h_upper);
+  const prev = `M${x(tAgora)},${y(pAtual)} L${x(t12)},${y(d.price_pred_12h)} L${x(t24)},${y(d.price_pred_24h)}`;
+  const grade = [0, .5, 1].map(f => { const v = min + f * faixa; return `<line class="grade" x1="${esq}" x2="${W - dir}" y1="${y(v)}" y2="${y(v)}"/><text class="eixo" x="${esq - 4}" y="${y(v) + 3}" text-anchor="end">${v >= 1e6 ? fmtCurto(v) : fmt(v)}</text>`; }).join("");
+  const dias = []; for (let t = Math.ceil(t0 / 86400) * 86400; t < t24; t += 2 * 86400) dias.push(t);
+  const eixoX = dias.map(t => `<text class="eixo" x="${x(t)}" y="${H - 6}" text-anchor="middle">${new Date(t * 1000).toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}</text>`).join("");
+  return `<div class="serie"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Histórico de preço e previsão com intervalo de confiança">
+    ${grade}<path class="faixa95" d="${f95}"/><path class="faixa80" d="${f80}"/>
+    <path class="linha" d="${linha}"/><path class="prev" d="${prev}"/>
+    <line class="agora" x1="${x(tAgora)}" x2="${x(tAgora)}" y1="${topo}" y2="${base}"/>${eixoX}</svg></div>
+    <p class="sub">Linha cheia = preço médio negociado (blocos de 6h, últimos 14 dias). Tracejado = previsão para +12h e +24h. Faixa escura = intervalo de 80%, clara = 95%.</p>`;
+}
+
+async function carregarPrevisaoItem(id) {
+  const caixa = $("det-previsao");
+  caixa.innerHTML = `<p class="sub">Calculando previsão…</p>`;
+  let d;
+  try { d = await obter(`/api/v1/predictions/${encodeURIComponent(id)}?regiao=${estado.regiao}`); }
+  catch (e) { caixa.innerHTML = `<p class="sub">Previsão indisponível (o modelo foi treinado?).</p>`; return; }
+  if (!d.disponivel) { caixa.innerHTML = `<p class="sub">Sem previsão: ${esc(d.motivo)}.</p>`; return; }
+  const v = d.validacao, ult = v.dobras[v.dobras.length - 1], sc = v.sinais_teste;
+  const pct = x => `${(x * 100).toLocaleString("pt-BR", {maximumFractionDigits: 0})}%`;
+  const selo = TXT_SELO[d.sinal] ? `<span class="selo-sinal ${d.sinal}">${TXT_SELO[d.sinal]}</span>` : `<span class="selo-sinal NEUTRO">${esc(d.sinal)}</span>`;
+  caixa.innerHTML = `
+    <h3>Sinal em ${esc(d.cidade)} ${selo}</h3>
+    <p class="sub">${esc(d.motivo)}.</p>
+    <p class="zscore">${textoZ(d.z_score_14d)} (média ${fmt(d.sma_14d)}).</p>
+    <div class="resumo">
+      <div><span>Preço atual (médio)</span><b>${fmt(d.preco_atual)}</b></div>
+      <div><span>Previsto em 12h</span><b>${fmt(d.price_pred_12h)}</b></div>
+      <div><span>Faixa 80% (12h)</span><b>${fmt(d.price_pred_lower)} – ${fmt(d.price_pred_upper)}</b></div>
+      <div><span>Previsto em 24h</span><b>${fmt(d.price_pred_24h)}</b></div>
+      <div><span>Menor venda / maior compra (24h)</span><b>${fmt(d.sell_price_min)} / ${fmt(d.buy_price_max)}</b></div>
+      <div><span>Spread</span><b>${d.spread_relative == null ? "–" : (d.spread_relative * 100).toLocaleString("pt-BR", {maximumFractionDigits: 1}) + "%"}</b></div>
+    </div>
+    ${graficoSerie(d)}
+    <h3>Por cidade</h3>
+    <div class="tabela"><table>
+      <thead><tr><th>Cidade</th><th>Atual</th><th>12h</th><th>Faixa 80%</th><th>24h</th><th>Z-score</th><th>Sinal</th></tr></thead>
+      <tbody>${d.cidades.map(c => `<tr><td>${esc(c.cidade || c.local)}</td><td class="num">${fmt(c.preco_atual)}</td>
+        <td class="num">${fmt(c.price_pred_12h)}</td><td class="num">${fmt(c.price_pred_lower)} – ${fmt(c.price_pred_upper)}</td>
+        <td class="num">${fmt(c.price_pred_24h)}</td><td class="num">${c.z_score_14d ?? "–"}</td>
+        <td>${TXT_SELO[c.sinal] ? `<span class="selo-sinal ${c.sinal}">${TXT_SELO[c.sinal]}</span>` : esc(c.sinal)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="sub">Modelo LightGBM (perda MAE) validado em walk-forward: na última dobra errou ${pct(ult.ganho_vs_ingenuo)} menos que "o preço não muda", acertou a direção em ${pct(ult.acerto_direcao)} e o intervalo de 80% cobriu ${pct(ult.cobertura_80)} dos casos.
+      Sinais no teste: compra acertou ${sc.COMPRA.acerto == null ? "–" : pct(sc.COMPRA.acerto)} (${sc.COMPRA.quantidade} casos), venda ${sc.VENDA.acerto == null ? "–" : pct(sc.VENDA.acerto)} (${sc.VENDA.quantidade}).
+      Sinais de compra costumam aparecer em quedas bruscas (às vezes uma venda isolada): confira o preço no jogo antes de comprar.
+      O preço é o médio negociado, pois o histórico do menor preço de venda não existe nos dados abertos.</p>`;
+}
+
+async function carregarOportunidades() {
+  try { estado.oportunidades = await obter(`/api/v1/crafting/opportunities?regiao=${estado.regiao}&limite=20`); }
+  catch (e) { estado.oportunidades = {erro: true}; }
+  if (estado.aba === "fabricar") desenhar();
+}
+
+function desenharOportunidades() {
+  $("explica").textContent = ABAS.fabricar.texto;
+  const o = estado.oportunidades;
+  if (!o) { $("conteudo").innerHTML = `<div class="vazio">Calculando oportunidades…</div>`; carregarOportunidades(); return; }
+  if (o.erro) { $("conteudo").innerHTML = `<div class="vazio">Não foi possível calcular (o modelo foi treinado?).</div>`; return; }
+  const lista = aplicarFiltros(o.itens, { recente: false });
+  $("conteudo").innerHTML = `<div class="tabela"><table>
+    <thead><tr><th>#</th><th>Item</th><th>Custo teórico</th><th>Venda</th><th>Margem</th><th>Fabricar em</th><th>Insumo mais barato que o normal</th><th>Vendas/dia</th></tr></thead>
+    <tbody>${lista.length ? lista.map((x, n) => {
+      const ins = x.materiais.reduce((a, b) => (b.z_score_14d ?? 99) < (a.z_score_14d ?? 99) ? b : a);
+      return `<tr data-id="${esc(x.id)}">
+        <td class="pos num">${n + 1}</td>
+        <td><div class="item"><img loading="lazy" src="${icone(x.id)}" alt=""><div><b>${esc(x.nome)}</b>${seloModelo(x.id)}<div class="tag">${tierTxt(x)} · ${esc(x.materiais.map(m => `${m.qtd}× ${m.nome}`).join(" + "))}</div></div></div></td>
+        <td class="num">${fmt(x.cost_theoretical)}</td>
+        <td class="num">${fmt(x.sell_price)} <span class="tag">${esc(x.sell_city)}</span></td>
+        <td class="num up">${x.crafting_margin_ratio.toLocaleString("pt-BR", {maximumFractionDigits: 2})}×</td>
+        <td>${esc(x.craft_city)} <span class="tag">retorno ${(x.rrf * 100).toLocaleString("pt-BR", {maximumFractionDigits: 1})}%</span></td>
+        <td>${esc(ins.nome)} em ${esc(ins.cidade)} <span class="tag">z ${ins.z_score_14d}</span></td>
+        <td class="num">${fmt(x.vendas_dia)}</td></tr>`;
+    }).join("") : `<tr><td colspan="8" class="vazio">Nenhuma oportunidade com esses filtros.</td></tr>`}</tbody>
+  </table></div>
+  <p class="sub">${o.total.toLocaleString("pt-BR")} fabricações acima de ${o.margem_minima.toLocaleString("pt-BR")}× o custo; mostrando as 20 com o insumo mais desvalorizado. Margem bruta: ainda falta descontar 6,5% de taxas de venda e a taxa da estação. Insumo com z-score muito negativo pode ser uma venda isolada: confira no jogo.</p>`;
 }
 
 /* ---------- ciclos semanais ---------- */

@@ -52,6 +52,7 @@ python3 -m venv .venv
 .venv/bin/python coletor.py            # deixe rodando em um terminal
 .venv/bin/python carga_inicial.py      # em outro terminal, uma vez
 .venv/bin/python previsao.py          # treina o modelo (depois da carga inicial)
+.venv/bin/python -m backend.models.predictor   # treina o LightGBM do módulo v2
 .venv/bin/uvicorn servidor:app --port 8000
 ```
 
@@ -75,6 +76,26 @@ Abra http://localhost:8000.
   último preço (5,6%). Por isso, só recebem sinal de comprar/vender os itens cujo ciclo se confirmou na semana de teste.
 - Com mais semanas de histórico (retenção agora de 180 dias, ou importando os dumps mensais do Albion Data Project)
   a validação fica mais confiável.
+
+## Módulo preditivo v2 (`backend/`)
+
+```
+backend/analytics/features.py   build_market_features(df): spread, volumes 7d/30d, desvio 7d, z-score 14d,
+                                sin/cos de dia e hora, lags 6h/12h/24h/7d, retornos, custo teórico e margem
+backend/models/predictor.py     LightGBM (perda MAE) para +12h e +24h, intervalos 80%/95% por regressão
+                                quantílica calibrada (CQR), validação walk-forward (TimeSeriesSplit com gap)
+backend/services/signals.py     generate_trade_signals: COMPRA / VENDA / NEUTRO com taxas de 6,5% e z-score ±1,5
+backend/api/routes.py           /api/v1/predictions/{item}, /api/v1/signals, /api/v1/crafting/opportunities, /api/v1/model
+```
+
+- Treino (1x por dia, ~6 min): `.venv/bin/python -m backend.models.predictor` → `dados/modelos_ml/`.
+- O "preço" das séries é o **preço médio negociado** em blocos de 6h: os dados abertos não guardam histórico
+  do menor preço de venda. Por isso o menor lag é 6h e o spread só existe para o momento atual (ordens das últimas 24h).
+- Validação (out/2026, Américas): erro 16% menor que "o preço não muda", direção certa em 66%, intervalo de 80%
+  cobriu 79,7% e o de 95% cobriu 94%. Sinal de venda acertou 77%; o de compra 93%, mas costuma aparecer em quedas
+  bruscas (venda isolada), por isso o site pede para conferir no jogo.
+- Sinais de todos os itens são calculados em lote (cache de 30 min, ~30 s por região) e aparecem como selo
+  (verde: oportunidade de compra, vermelho: hora de vender, cinza: estável).
 
 ## Detalhes dos dados (aprendidos no projeto)
 
