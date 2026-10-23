@@ -94,6 +94,11 @@ backend/api/routes.py           /api/v1/predictions/{item}, /api/v1/signals, /ap
 - Validação (out/2026, Américas): erro 16% menor que "o preço não muda", direção certa em 66%, intervalo de 80%
   cobriu 79,7% e o de 95% cobriu 94%. Sinal de venda acertou 77%; o de compra 93%, mas costuma aparecer em quedas
   bruscas (venda isolada), por isso o site pede para conferir no jogo.
+- Horizontes: 12h, 24h, 3 dias e 7 dias (aba "Previsão 7 dias / 4 semanas" e gráfico no detalhe do item).
+  Validação de 7 dias: erro 10% menor que "não muda", direção certa em 62%, faixas cobriram 75% (80%) e 92% (95%).
+  Treinar só alguns horizontes: `python -m backend.models.predictor 3d 7d`.
+- 4 semanas: **projeção estatística não validada** (parte da previsão de 7 dias e alarga a faixa pela volatilidade
+  semanal do item). Com ~30 dias de histórico não dá para testar 4 semanas; são precisos pelo menos 56 dias.
 - Sinais de todos os itens são calculados em lote (cache de 30 min, ~30 s por região) e aparecem como selo
   (verde: oportunidade de compra, vermelho: hora de vender, cinza: estável).
 

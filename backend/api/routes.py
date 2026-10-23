@@ -81,7 +81,60 @@ def _resumo_linha(linha, prev, i):
         "price_pred_24h_upper_95": _num(p24["price_pred_upper_95"][i]),
         "ts": int(linha["ts"]),
         **sinal,
+        **_horizontes_longos(linha, prev, i),
     }
+
+
+Z80, Z95 = 1.2816, 1.96
+SEMANAS_PROJECAO = 4
+
+
+def _horizontes_longos(linha, prev, i):
+    """Previsões de 3 e 7 dias (modelo) e projeção de 4 semanas (estatística).
+
+    A projeção parte da previsão de 7 dias e soma a incerteza das semanas
+    seguintes pela volatilidade semanal real da série (passeio aleatório):
+    desvio_k = sqrt(desvio_semana1² + vol_semanal² × (k − 1)).
+    Não é validada: o histórico disponível (~30 dias) não permite testar 4 semanas.
+    """
+    if "7d" not in prev:
+        return {}
+    ts = int(linha["ts"])
+    saida = {"horizontes": []}
+    for nome, horas in (("12h", 12), ("24h", 24), ("3d", 72), ("7d", 168)):
+        if nome not in prev:
+            continue
+        p = prev[nome]
+        saida["horizontes"].append({
+            "nome": nome, "ts": ts + horas * 3600,
+            "pred": _num(p["price_pred"][i]),
+            "lo80": _num(p["price_pred_lower"][i]), "hi80": _num(p["price_pred_upper"][i]),
+            "lo95": _num(p["price_pred_lower_95"][i]), "hi95": _num(p["price_pred_upper_95"][i]),
+        })
+    p7 = prev["7d"]
+    centro = float(p7["price_pred"][i])
+    lo, hi = float(p7["price_pred_lower"][i]), float(p7["price_pred_upper"][i])
+    s1 = max(np.log(hi / lo) / (2 * Z80), 1e-4) if lo > 0 else 0.1
+    vol = linha.get("vol_semanal")
+    vol = float(vol) if vol is not None and not np.isnan(vol) else s1
+    semanas = []
+    for k in range(1, SEMANAS_PROJECAO + 1):
+        dp = np.sqrt(s1 ** 2 + vol ** 2 * (k - 1))
+        semanas.append({
+            "semana": k, "ts": ts + k * 7 * 86400, "pred": _num(centro),
+            "lo80": _num(centro * np.exp(-Z80 * dp)), "hi80": _num(centro * np.exp(Z80 * dp)),
+            "lo95": _num(centro * np.exp(-Z95 * dp)), "hi95": _num(centro * np.exp(Z95 * dp)),
+        })
+    preco = float(linha["price"])
+    saida.update(
+        semanas=semanas,
+        price_pred_3d=_num(prev["3d"]["price_pred"][i]) if "3d" in prev else None,
+        price_pred_7d=_num(centro), price_pred_7d_lower=_num(lo), price_pred_7d_upper=_num(hi),
+        var_7d=round(centro / preco - 1, 4) if preco else None,
+        incerteza_7d=round((hi - lo) / centro, 4) if centro else None,
+        vol_semanal=_num(vol, 4),
+    )
+    return saida
 
 
 def _ultimas_linhas(df):
@@ -101,6 +154,7 @@ def calcular_lote(regiao):
     con.close()
     df = F.build_market_features(df, info_itens=srv.ref.info, ordens=ordens)
     ult = _ultimas_linhas(df)
+    dias_historico = round(float(df["ts"].max() - df["ts"].min()) / 86400, 1) if len(df) else 0
     del df
     agora = time.time()
     ult = ult[(ult["volume_rolling_7d"] >= 1) & (ult["ultima_venda"] >= agora - MAX_IDADE_VENDA)]
@@ -108,7 +162,7 @@ def calcular_lote(regiao):
     prev = preditor().prever(ult) if len(ult) else None
     linhas = [_resumo_linha(ult.iloc[i], prev, i) | {"item": ult.at[i, "item"]}
               for i in range(len(ult))]
-    return {"gerado_em": int(agora), "linhas": linhas}
+    return {"gerado_em": int(agora), "linhas": linhas, "dias_historico": dias_historico}
 
 
 _travas_regiao = {r: threading.Lock() for r in REGIOES}
@@ -162,6 +216,39 @@ def sinais(regiao: str = Query("west")):
     return {"gerado_em": lt["gerado_em"], "itens": por_item}
 
 
+@router.get("/forecast")
+def previsao_longa(regiao: str = Query("west")):
+    """Previsão de 7 dias de todos os itens líquidos (uma cidade por item: a mais negociada)."""
+    if regiao not in REGIOES:
+        raise HTTPException(404, "Região inválida")
+    srv = _servidor()
+    lt = lote(regiao)
+    meta = preditor().meta["horizontes"]
+    if "7d" not in meta:
+        raise HTTPException(503, "Modelo de 7 dias ainda não treinado")
+    por_item = {}
+    for l in lt["linhas"]:
+        if l.get("var_7d") is None or (l["volume_rolling_7d"] or 0) < 5:
+            continue
+        por_item.setdefault(l["item"], []).append(l)
+    itens = []
+    for item, linhas in por_item.items():
+        info = srv.ref.info(item)
+        cidades = sorted(linhas, key=lambda l: -(l["volume_rolling_7d"] or 0))
+        itens.append({
+            "id": item, "nome": info["nome"], "tier": info["tier"], "enc": info["enc"],
+            "cidades": [{k: l[k] for k in ("local", "cidade", "preco_atual", "price_pred_3d",
+                                           "price_pred_7d", "price_pred_7d_lower", "price_pred_7d_upper",
+                                           "var_7d", "incerteza_7d", "volume_rolling_7d", "sinal")}
+                        | {"semana4": l["semanas"][-1]} for l in cidades],
+        })
+    return {
+        "gerado_em": lt["gerado_em"], "itens": itens,
+        "validacao": {h: {"dobras": meta[h]["dobras"]} for h in ("3d", "7d") if h in meta},
+        "dias_historico": lt.get("dias_historico", 0),
+    }
+
+
 @router.get("/predictions/{item_id}")
 def previsao_item(item_id: str, regiao: str = Query("west"), cidade: int | None = Query(None)):
     srv = _servidor()
@@ -198,6 +285,10 @@ def previsao_item(item_id: str, regiao: str = Query("west"), cidade: int | None 
         "historico": [{"ts": int(t), "preco": round(float(p))}
                       for t, p in zip(hist["ts"], hist["price"])],
         "validacao": {"dobras": meta["dobras"], "sinais_teste": meta["sinais_teste"]},
+        "validacao_longa": {h: preditor().meta["horizontes"][h]["dobras"]
+                            for h in ("3d", "7d") if h in preditor().meta["horizontes"]},
+        "historico_longo": [{"ts": int(t), "preco": round(float(p))} for t, p in zip(
+            *df[(df["local"] == principal["local"]) & df["has_sale"]][["ts", "price"]].to_numpy().T)],
     }
 
 

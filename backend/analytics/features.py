@@ -128,6 +128,10 @@ def build_market_features(df, info_itens=None, ordens=None, custos=None):
         df[f"lag_{nome}"] = g["price"].shift(passos)
         df[f"pct_change_{nome}"] = df["price"] / df[f"lag_{nome}"] - 1
 
+    # --- Volatilidade semanal (para a projeção de 4 semanas) ---
+    df["log_ret_7d"] = np.log(df["price"] / df["lag_7d"])
+    df["vol_semanal"] = _rolar(df, "log_ret_7d", JANELA_30D, POR_DIA * 3, "std")
+
     # --- Derivadas usadas pelo modelo ---
     df["dist_sma_7d"] = df["price"] / sma_7d - 1
     df["cv_7d"] = df["price_std_7d"] / sma_7d
@@ -162,18 +166,18 @@ def build_market_features(df, info_itens=None, ordens=None, custos=None):
     return df.replace([np.inf, -np.inf], np.nan)
 
 
-def adicionar_alvos(df, horizontes=(2, 4)):
-    """Alvos: log(preço futuro / preço atual) para 12h (2 blocos) e 24h (4 blocos).
+def adicionar_alvos(df, horizontes=None):
+    """Alvos target_<nome> = log(preço futuro / preço atual), ex.: {"12h": 2, "7d": 28} (blocos de 6h).
 
     Só vale quando houve venda de verdade no bloco futuro (não preço repetido).
     """
+    horizontes = horizontes or {"12h": 2, "24h": 4}
     g = df.groupby(["item", "local"], sort=False)
-    for passos in horizontes:
-        h = passos * BLOCO_H
+    for nome, passos in horizontes.items():
         futuro = g["price"].shift(-passos)
         teve_venda = g["has_sale"].shift(-passos).astype("boolean").fillna(False).astype(bool)
         alvo = np.log(futuro / df["price"])
-        df[f"target_{h}h"] = alvo.where(teve_venda & df["has_sale"])
+        df[f"target_{nome}"] = alvo.where(teve_venda & df["has_sale"])
     return df
 
 

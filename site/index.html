@@ -169,6 +169,11 @@ tr.melhor td { background: var(--accent-soft); }
 .serie .grade { stroke: var(--line); }
 .serie .agora { stroke: var(--muted); stroke-dasharray: 3 3; }
 
+.serie .proj95 { fill: var(--muted); opacity: .12; }
+.serie .proj80 { fill: var(--muted); opacity: .22; }
+.serie .proj { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 2 4; }
+.serie .rotulo { fill: var(--muted); font-size: 10px; }
+
 /* Previsão no topo */
 .previsao { margin: 10px 0 4px; }
 .previsao h2 { font-size: .95rem; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
@@ -262,6 +267,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <button class="aba" data-aba="comparar" aria-pressed="false">Comparar mercados</button>
     <button class="aba" data-aba="ciclos" aria-pressed="false">Ciclos semanais</button>
     <button class="aba" data-aba="fabricar" aria-pressed="false">Oportunidades de fabricação</button>
+    <button class="aba" data-aba="longo" aria-pressed="false">Previsão 7 dias / 4 semanas</button>
     <button class="aba bm" data-aba="negro" aria-pressed="false">Mercado Negro</button>
   </div>
   <p class="explica" id="explica"></p>
@@ -285,6 +291,15 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       <option value="comprar">Bom para comprar agora</option>
       <option value="vender">Bom para vender agora</option>
     </select></label>
+  </div>
+
+  <div class="comparar" id="longo-ctrl" hidden>
+    <label>Mostrar <select id="ordem-longo">
+      <option value="alta">Maior alta prevista em 7 dias</option>
+      <option value="queda">Maior queda prevista em 7 dias</option>
+      <option value="confianca">Previsões mais firmes (faixa mais estreita)</option>
+    </select></label>
+    <label><input type="checkbox" id="so-firmes" checked> Só previsões firmes (faixa de 80% até 40% do preço e 20+ vendas/dia)</label>
   </div>
 
   <div class="filtros">
@@ -377,6 +392,9 @@ const ABAS = {
   },
   fabricar: {
     texto: "Itens cuja venda paga mais de 15% acima do custo teórico de fabricação (materiais na cidade mais barata, já com o retorno de recursos da melhor cidade, sem foco e sem a taxa da estação). Ordenados pelo insumo mais abaixo da média (menor z-score).",
+  },
+  longo: {
+    texto: "Previsão do preço médio para os próximos 7 dias (modelo LightGBM validado) e projeção até 4 semanas (estatística, ainda não validada).",
   },
   negro: {
     texto: "Os 5 itens mais em alta no Mercado Negro (Caerleon): o que os NPCs estão comprando acima do normal nas últimas 24h.",
@@ -602,7 +620,7 @@ let esperaBusca;
 $("busca").addEventListener("input", () => {
   clearTimeout(esperaBusca);
   const q = $("busca").value.trim();
-  if (["comparar", "ciclos", "fabricar"].includes(estado.aba) || q.length < 2) { estado.busca = null; desenhar(); return; }
+  if (["comparar", "ciclos", "fabricar", "longo"].includes(estado.aba) || q.length < 2) { estado.busca = null; desenhar(); return; }
   esperaBusca = setTimeout(async () => {
     try {
       const achados = await obter(`/api/busca?q=${encodeURIComponent(q)}&limite=100`);
@@ -733,10 +751,12 @@ function desenhar() {
   $("comparar").hidden = !comparar;
   const ciclosAba = estado.aba === "ciclos";
   $("ciclos-ctrl").hidden = !ciclosAba;
-  $("recente").hidden = ciclosAba || comparar || estado.aba === "fabricar";
+  $("longo-ctrl").hidden = estado.aba !== "longo";
+  $("recente").hidden = ciclosAba || comparar || ["fabricar", "longo"].includes(estado.aba);
   if (comparar) return desenharComparacao();
   if (ciclosAba) return desenharCiclos();
   if (estado.aba === "fabricar") return desenharOportunidades();
+  if (estado.aba === "longo") return desenharLongo();
   if (estado.busca) return desenharBusca();
   if (negro) return desenharNegro();
 
@@ -943,7 +963,7 @@ async function carregarPrevisaoItem(id) {
   caixa.innerHTML = `<p class="sub">Calculando previsão…</p>`;
   let d;
   try { d = await obter(`/api/v1/predictions/${encodeURIComponent(id)}?regiao=${estado.regiao}`); }
-  catch (e) { caixa.innerHTML = `<p class="sub">Previsão indisponível (o modelo foi treinado?).</p>`; return; }
+  catch (e) { caixa.innerHTML = `<p class="sub">Previsão indisponível para este item no momento.</p>`; return; }
   if (!d.disponivel) { caixa.innerHTML = `<p class="sub">Sem previsão: ${esc(d.motivo)}.</p>`; return; }
   const v = d.validacao, ult = v.dobras[v.dobras.length - 1], sc = v.sinais_teste;
   const pct = x => `${(x * 100).toLocaleString("pt-BR", {maximumFractionDigits: 0})}%`;
@@ -961,6 +981,11 @@ async function carregarPrevisaoItem(id) {
       <div><span>Spread</span><b>${d.spread_relative == null ? "–" : (d.spread_relative * 100).toLocaleString("pt-BR", {maximumFractionDigits: 1}) + "%"}</b></div>
     </div>
     ${graficoSerie(d)}
+    ${d.horizontes ? `<h3>Próximos 7 dias e 4 semanas</h3>
+    <div class="resumo">${d.horizontes.filter(h => h.nome === "3d" || h.nome === "7d").map(h => `<div><span>Em ${h.nome === "3d" ? "3 dias" : "7 dias"}</span><b>${fmt(h.pred)}</b><span>80%: ${fmt(h.lo80)} – ${fmt(h.hi80)}</span></div>`).join("")}
+      ${d.semanas ? `<div><span>4ª semana (projeção)</span><b>${fmt(d.semanas[3].lo80)} – ${fmt(d.semanas[3].hi80)}</b><span>faixa de 80%</span></div>` : ""}</div>
+    ${graficoLongo(d)}
+    <p class="sub">Linha cheia = 30 dias de histórico. Laranja = previsão do modelo até 7 dias (${validacaoTxt(d.validacao_longa && d.validacao_longa["7d"])} no teste). Cinza = projeção estatística até 4 semanas, <b>não validada</b> (histórico curto).</p>` : ""}
     <h3>Por cidade</h3>
     <div class="tabela"><table>
       <thead><tr><th>Cidade</th><th>Atual</th><th>12h</th><th>Faixa 80%</th><th>24h</th><th>Z-score</th><th>Sinal</th></tr></thead>
@@ -1003,6 +1028,98 @@ function desenharOportunidades() {
     }).join("") : `<tr><td colspan="8" class="vazio">Nenhuma oportunidade com esses filtros.</td></tr>`}</tbody>
   </table></div>
   <p class="sub">${o.total.toLocaleString("pt-BR")} fabricações acima de ${o.margem_minima.toLocaleString("pt-BR")}× o custo; mostrando as 20 com o insumo mais desvalorizado. Margem bruta: ainda falta descontar 6,5% de taxas de venda e a taxa da estação. Insumo com z-score muito negativo pode ser uma venda isolada: confira no jogo.</p>`;
+}
+
+/* ---------- previsão de 7 dias e 4 semanas ---------- */
+async function carregarLongo() {
+  try { estado.longo = await obter(`/api/v1/forecast?regiao=${estado.regiao}`); estado.longoRegiao = estado.regiao; }
+  catch (e) { estado.longo = {erro: true}; }
+  if (estado.aba === "longo") desenhar();
+}
+
+function validacaoTxt(dobras) {
+  if (!dobras || !dobras.length) return "–";
+  const d = dobras[dobras.length - 1];
+  const pct = x => `${(x * 100).toLocaleString("pt-BR", {maximumFractionDigits: 0})}%`;
+  return `erro ${pct(d.ganho_vs_ingenuo)} menor que "não muda", direção certa em ${pct(d.acerto_direcao)}, faixa de 80% cobriu ${pct(d.cobertura_80)}`;
+}
+
+function desenharLongo() {
+  $("explica").textContent = ABAS.longo.texto;
+  const o = estado.longo;
+  if (!o || o.erro || estado.longoRegiao !== estado.regiao) {
+    $("conteudo").innerHTML = `<div class="vazio">${o && o.erro ? "Previsão de 7 dias indisponível (o modelo foi treinado?)." : "Calculando previsões…"}</div>`;
+    if (!o || estado.longoRegiao !== estado.regiao) carregarLongo();
+    return;
+  }
+  const cidade = estado.cidade ? Number(estado.cidade) : null;
+  const q = semAcento($("busca").value.trim());
+  let lista = aplicarFiltros(o.itens, { recente: false })
+    .filter(i => !q || semAcento(i.nome).includes(q))
+    .map(i => ({...i, c: cidade == null ? i.cidades[0] : i.cidades.find(c => c.local === cidade)}))
+    .filter(i => i.c && i.c.var_7d != null)
+    // Itens instáveis ou pouco negociados geram altas/quedas enormes e pouco confiáveis
+    .filter(i => !$("so-firmes").checked || (i.c.incerteza_7d <= 0.4 && (i.c.volume_rolling_7d || 0) >= 20));
+  const ordem = $("ordem-longo").value;
+  const chave = {alta: i => i.c.var_7d, queda: i => -i.c.var_7d, confianca: i => -i.c.incerteza_7d}[ordem];
+  lista = lista.sort((a, b) => chave(b) - chave(a)).slice(0, LIMITE);
+  const pct = v => `${v > 0 ? "+" : ""}${(v * 100).toLocaleString("pt-BR", {maximumFractionDigits: 1})}%`;
+  const v = o.validacao;
+  $("conteudo").innerHTML = `
+    <div class="ciclo-topo">
+      <div class="painel">
+        <h3>Validação (dados fora do treino)</h3>
+        <p><b>3 dias:</b> ${validacaoTxt(v["3d"] && v["3d"].dobras)}.</p>
+        <p><b>7 dias:</b> ${validacaoTxt(v["7d"] && v["7d"].dobras)}.</p>
+      </div>
+      <div class="painel">
+        <h3>4 semanas: projeção</h3>
+        <p>O histórico disponível tem <b>${o.dias_historico.toLocaleString("pt-BR")} dias</b>. Para testar uma previsão de 4 semanas são precisos pelo menos 56 (4 de passado + 4 de futuro), então a 4ª semana é uma <b>projeção não validada</b>: parte da previsão de 7 dias e abre a faixa conforme a volatilidade semanal real do item.</p>
+      </div>
+    </div>
+    <div class="tabela"><table>
+      <thead><tr><th>#</th><th>Item</th><th>Cidade</th><th>Atual</th><th>3 dias</th><th>7 dias</th><th>Var. 7d</th><th>Faixa 80% (7d)</th><th>4ª semana (80%)</th></tr></thead>
+      <tbody>${lista.length ? lista.map((i, n) => `<tr data-id="${esc(i.id)}">
+        <td class="pos num">${n + 1}</td>
+        <td><div class="item"><img loading="lazy" src="${icone(i.id)}" alt=""><div><b>${esc(i.nome)}</b>${seloModelo(i.id)}<div class="tag">${tierTxt(i)}</div></div></div></td>
+        <td>${esc(i.c.cidade || "")}</td>
+        <td class="num">${fmt(i.c.preco_atual)}</td>
+        <td class="num">${fmt(i.c.price_pred_3d)}</td>
+        <td class="num"><b>${fmt(i.c.price_pred_7d)}</b></td>
+        <td class="num"><span class="${i.c.var_7d >= 0 ? "up" : "down"}">${pct(i.c.var_7d)}</span></td>
+        <td class="num">${fmt(i.c.price_pred_7d_lower)} – ${fmt(i.c.price_pred_7d_upper)}</td>
+        <td class="num tag">${fmt(i.c.semana4.lo80)} – ${fmt(i.c.semana4.hi80)}</td></tr>`).join("")
+        : `<tr><td colspan="9" class="vazio">Nenhum item com esses filtros.</td></tr>`}</tbody>
+    </table></div>
+    <p class="sub">Preço = médio negociado (qualidade Normal), na cidade mais negociada do item ou na cidade escolhida no filtro. Sem o filtro de previsões firmes aparecem itens instáveis com variações de +100% ou mais, quase sempre preços que despencaram e o modelo espera que voltem. Clique num item para ver o gráfico de 7 dias e 4 semanas.</p>`;
+}
+
+function graficoLongo(d) {
+  const hist = d.historico_longo || [], hz = d.horizontes || [], sem = d.semanas || [];
+  if (!hist.length || !hz.length) return "";
+  const futuro = [{ts: d.ts, pred: d.preco_atual, lo80: d.preco_atual, hi80: d.preco_atual, lo95: d.preco_atual, hi95: d.preco_atual}, ...hz];
+  const proj = [hz[hz.length - 1], ...sem.slice(1)];
+  const t0 = hist[0].ts, tf = sem.length ? sem[sem.length - 1].ts : hz[hz.length - 1].ts;
+  const valores = [...hist.map(p => p.preco), ...futuro.flatMap(p => [p.lo95, p.hi95]), ...proj.flatMap(p => [p.lo95, p.hi95])].filter(v => v != null);
+  const min = Math.min(...valores), max = Math.max(...valores), faixa = (max - min) || 1;
+  const W = 700, H = 240, esq = 55, dir = 10, topo = 10, base = 205;
+  const x = t => esq + (t - t0) / (tf - t0) * (W - esq - dir);
+  const y = v => base - (v - min) / faixa * (base - topo);
+  const caminho = pts => pts.map((p, i) => `${i ? "L" : "M"}${x(p.ts).toFixed(1)},${y(p.pred ?? p.preco).toFixed(1)}`).join(" ");
+  const area = (pts, lo, hi) => `M${pts.map(p => `${x(p.ts).toFixed(1)},${y(p[lo]).toFixed(1)}`).join(" L")} L${[...pts].reverse().map(p => `${x(p.ts).toFixed(1)},${y(p[hi]).toFixed(1)}`).join(" L")} Z`;
+  const grade = [0, .5, 1].map(f => { const v = min + f * faixa; return `<line class="grade" x1="${esq}" x2="${W - dir}" y1="${y(v)}" y2="${y(v)}"/><text class="eixo" x="${esq - 4}" y="${y(v) + 3}" text-anchor="end">${v >= 1e6 ? fmtCurto(v) : fmt(v)}</text>`; }).join("");
+  const marcas = []; for (let t = Math.ceil(t0 / 86400) * 86400; t <= tf; t += 7 * 86400) marcas.push(t);
+  const eixoX = marcas.map(t => `<text class="eixo" x="${x(t)}" y="${H - 6}" text-anchor="middle">${new Date(t * 1000).toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"})}</text>`).join("");
+  const t7 = hz[hz.length - 1].ts;
+  return `<div class="serie"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Histórico de 30 dias, previsão de 7 dias e projeção de 4 semanas">
+    ${grade}
+    <path class="proj95" d="${area(proj, "lo95", "hi95")}"/><path class="proj80" d="${area(proj, "lo80", "hi80")}"/>
+    <path class="faixa95" d="${area(futuro, "lo95", "hi95")}"/><path class="faixa80" d="${area(futuro, "lo80", "hi80")}"/>
+    <path class="linha" d="${caminho(hist)}"/><path class="prev" d="${caminho(futuro)}"/><path class="proj" d="${caminho(proj)}"/>
+    <line class="agora" x1="${x(d.ts)}" x2="${x(d.ts)}" y1="${topo}" y2="${base}"/>
+    <line class="agora" x1="${x(t7)}" x2="${x(t7)}" y1="${topo}" y2="${base}"/>
+    <text class="rotulo" x="${x(d.ts) + 4}" y="${topo + 10}">agora</text>
+    <text class="rotulo" x="${x(t7) + 4}" y="${topo + 10}">+7 dias</text>${eixoX}</svg></div>`;
 }
 
 /* ---------- ciclos semanais ---------- */
@@ -1177,6 +1294,8 @@ $("chips-grupo").addEventListener("click", e => {
   montarChipsGrupo(); desenhar();
 });
 $("ordem-ciclos").addEventListener("input", desenhar);
+$("ordem-longo").addEventListener("input", desenhar);
+$("so-firmes").addEventListener("change", desenhar);
 document.querySelectorAll("[data-det]").forEach(b => b.addEventListener("click", () => trocarAbaDetalhe(b.dataset.det)));
 document.querySelectorAll(".abas .aba").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll(".abas .aba").forEach(x => x.setAttribute("aria-pressed", x === b));

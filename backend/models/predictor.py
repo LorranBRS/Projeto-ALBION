@@ -29,7 +29,7 @@ from itens import Referencia  # noqa: E402
 
 PASTA_MODELOS = PASTA_DADOS / "modelos_ml"
 ARQ_META = PASTA_MODELOS / "meta.json"
-HORIZONTES = {"12h": 2, "24h": 4}                 # nome -> blocos de 6h
+HORIZONTES = {"12h": 2, "24h": 4, "3d": 12, "7d": 28}   # nome -> blocos de 6h
 QUANTIS = {"q025": 0.025, "q10": 0.10, "q90": 0.90, "q975": 0.975}
 MIN_VENDAS_DIA = 5                                # liquidez mínima para treinar/prever
 REGIAO_TREINO = "west"                            # região com mais dados
@@ -52,7 +52,7 @@ def preparar_base(regiao=REGIAO_TREINO):
     ref = Referencia()
     df = F.carregar_historico(regiao)
     df = F.build_market_features(df, info_itens=ref.info)
-    df = F.adicionar_alvos(df, horizontes=tuple(HORIZONTES.values()))
+    df = F.adicionar_alvos(df, horizontes=HORIZONTES)
     df = df[df["volume_rolling_7d"] >= MIN_VENDAS_DIA]
     return df
 
@@ -70,11 +70,19 @@ def _ajuste_conformal(y, lo, hi, nivel):
 
 
 def validar_e_treinar(df, nome, passos, n_dobras=4):
+    # Horizontes longos têm poucos pontos de partida com futuro conhecido
+    if passos >= 12:
+        n_dobras = 3
     alvo = f"target_{nome}"
     base = df.dropna(subset=[alvo]).sort_values("ts")
     X, y, ts = base[F.COLUNAS_MODELO], base[alvo].to_numpy(), base["ts"].to_numpy()
     instantes = np.unique(ts)
-    tss = TimeSeriesSplit(n_splits=n_dobras, gap=passos)
+    if passos >= 28:
+        # 7 dias: poucos pontos de partida com futuro conhecido (histórico curto);
+        # 2 dobras com janelas de teste menores deixam treino suficiente
+        tss = TimeSeriesSplit(n_splits=2, gap=passos, test_size=max(8, len(instantes) // 7))
+    else:
+        tss = TimeSeriesSplit(n_splits=n_dobras, gap=passos)
 
     dobras = []
     for i, (idx_tr, idx_te) in enumerate(tss.split(instantes)):
@@ -155,19 +163,23 @@ def testar_sinais(ultima, ajuste):
     return resumo
 
 
-def main():
+def main(apenas=None):
+    """Treina todos os horizontes, ou só os pedidos (ex.: python -m backend.models.predictor 7d)."""
     inicio = time.time()
     print("Preparando base de treino...")
     df = preparar_base()
-    meta = {"treinado_em": int(time.time()), "regiao_treino": REGIAO_TREINO,
-            "colunas": F.COLUNAS_MODELO, "horizontes": {}}
+    meta = {"horizontes": {}}
+    if apenas and ARQ_META.exists():
+        meta = json.loads(ARQ_META.read_text(encoding="utf-8"))
+    meta.update(treinado_em=int(time.time()), regiao_treino=REGIAO_TREINO, colunas=F.COLUNAS_MODELO)
     for nome, passos in HORIZONTES.items():
+        if apenas and nome not in apenas:
+            continue
         print(f"Horizonte {nome}:")
         meta["horizontes"][nome] = validar_e_treinar(df, nome, passos)
     PASTA_MODELOS.mkdir(parents=True, exist_ok=True)
     ARQ_META.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({k: {"sinais": v["sinais_teste"], "ajuste": v["ajuste_conformal"]}
-                      for k, v in meta["horizontes"].items()}, indent=1))
+    print(json.dumps({k: v["sinais_teste"] for k, v in meta["horizontes"].items()}, indent=1))
     print(f"Modelos gravados em {PASTA_MODELOS} ({time.time() - inicio:.0f} s)")
 
 
@@ -202,4 +214,5 @@ class Preditor:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(set(sys.argv[1:]) or None)
