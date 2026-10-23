@@ -1,0 +1,1089 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Albion em Alta</title>
+<meta name="description" content="O que está em alta no mercado do Albion Online agora, com dados do Albion Data Project.">
+<script>
+  // Aplica o tema salvo antes de desenhar a página (evita piscar)
+  try {
+    const t = localStorage.getItem("tema");
+    if (t) document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+<style>
+:root {
+  --bg: #f6f4ef; --card: #ffffff; --text: #1f1d1a; --muted: #6b665d;
+  --line: #e4dfd4; --accent: #b4730f; --accent-soft: #f6e7cc;
+  --up: #1d7a3e; --down: #b3261e; --row-hover: #faf6ec;
+  --bm: #6b3fa0; --bm-soft: #efe7f8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15140f; --card: #1e1c17; --text: #ece7dc; --muted: #a39d90;
+    --line: #34312a; --accent: #e3a33a; --accent-soft: #3a2e17;
+    --up: #5cc983; --down: #f2766c; --row-hover: #262319;
+    --bm: #b48ae6; --bm-soft: #2a2236;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15140f; --card: #1e1c17; --text: #ece7dc; --muted: #a39d90;
+  --line: #34312a; --accent: #e3a33a; --accent-soft: #3a2e17;
+  --up: #5cc983; --down: #f2766c; --row-hover: #262319;
+  --bm: #b48ae6; --bm-soft: #2a2236;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+header { padding: 20px 0 8px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+h1 { margin: 0; font-size: 1.6rem; letter-spacing: -.01em; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); font-size: .85rem; }
+.acoes { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+select, input, .botao {
+  font: inherit; color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px;
+}
+.botao { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.botao:hover { border-color: var(--accent); }
+.botao:disabled { opacity: .6; cursor: wait; }
+.botao svg { width: 16px; height: 16px; }
+.girando svg { animation: gira 1s linear infinite; }
+@keyframes gira { to { transform: rotate(360deg); } }
+.abas { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 10px; }
+.aba {
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; font-size: .9rem;
+}
+.aba[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.aba.bm { border-color: var(--bm); color: var(--bm); }
+.aba.bm[aria-pressed="true"] { background: var(--bm); color: #fff; }
+.explica { color: var(--muted); font-size: .88rem; margin: 0 0 10px; min-height: 1.3em; }
+.filtros { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.filtros input { flex: 1 1 220px; }
+.aviso {
+  background: var(--accent-soft); border-radius: 8px; padding: 8px 12px;
+  font-size: .88rem; margin-bottom: 12px;
+}
+.tabela { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 760px; }
+th, td { padding: 8px 10px; text-align: right; white-space: nowrap; }
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+th:nth-child(2), td:nth-child(2) { text-align: left; }
+tbody tr { border-bottom: 1px solid var(--line); cursor: pointer; }
+tbody tr:last-child { border-bottom: 0; }
+tbody tr:hover { background: var(--row-hover); }
+td.pos { color: var(--muted); width: 36px; }
+.item { display: flex; align-items: center; gap: 10px; }
+.item img { width: 40px; height: 40px; flex: none; }
+.item b { font-weight: 600; white-space: normal; }
+.tag { font-size: .75rem; color: var(--muted); }
+.up { color: var(--up); } .down { color: var(--down); }
+.num { font-variant-numeric: tabular-nums; }
+.vazio { padding: 40px; text-align: center; color: var(--muted); }
+
+/* Mercado Negro: 5 cartões */
+.cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.cartao {
+  background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--bm);
+  border-radius: 12px; padding: 14px; cursor: pointer; display: flex; flex-direction: column; gap: 8px;
+}
+.cartao:hover { background: var(--row-hover); }
+.cartao .topo { display: flex; gap: 10px; align-items: center; }
+.cartao img { width: 56px; height: 56px; flex: none; }
+.cartao .pos { font-size: 1.4rem; font-weight: 700; color: var(--bm); min-width: 1.4em; }
+.cartao b { font-weight: 600; line-height: 1.25; }
+.cartao dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin: 0; font-size: .88rem; }
+.cartao dt { color: var(--muted); }
+.cartao dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+/* Filtros em chips (seleção múltipla) */
+.chips-linha { display: flex; gap: 8px 18px; flex-wrap: wrap; align-items: center; margin: -4px 0 12px; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.chips-rotulo { font-size: .8rem; color: var(--muted); margin-right: 4px; }
+.chip {
+  font: inherit; font-size: .85rem; min-width: 38px; padding: 4px 9px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 6px;
+}
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.limpar { font: inherit; font-size: .82rem; background: none; border: 0; color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+/* Bônus do dia */
+.bonus-dia {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; margin: 8px 0 4px; font-size: .88rem;
+}
+.bonus-dia b { font-weight: 600; }
+.bonus-chip { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.bonus-chip strong { color: var(--up); }
+
+/* Abas do detalhe e fabricação */
+.det-abas { display: flex; gap: 6px; margin-bottom: 4px; }
+.det-abas .aba { font-size: .85rem; padding: 5px 12px; }
+.craft-opcoes { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 10px 0; font-size: .88rem; }
+.craft-opcoes input[type=number] { width: 90px; }
+.resumo { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 8px 0; }
+.resumo div { background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.resumo span { display: block; font-size: .75rem; color: var(--muted); }
+.resumo b { font-variant-numeric: tabular-nums; }
+.mini { width: 28px; height: 28px; vertical-align: middle; margin-right: 6px; }
+tr.melhor td { background: var(--accent-soft); }
+.selo { display: inline-block; font-size: .72rem; border-radius: 999px; padding: 1px 7px; background: var(--accent-soft); color: var(--text); margin-left: 4px; }
+.refino-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.refino-card p { margin: 4px 0; font-size: .88rem; }
+
+/* Ciclos semanais */
+.ciclo-topo { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin-bottom: 12px; }
+@media (max-width: 760px) { .ciclo-topo { grid-template-columns: 1fr; } }
+.painel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.painel h3 { margin: 0 0 6px; font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.painel p { margin: 4px 0; font-size: .88rem; }
+.curva svg { width: 100%; height: 150px; display: block; }
+.curva .pos-barra { fill: var(--down); } .curva .neg-barra { fill: var(--up); }
+.curva .eixo { fill: var(--muted); font-size: 10px; }
+.curva .zero { stroke: var(--line); }
+.curva .linha { fill: none; stroke: var(--accent); stroke-width: 2; }
+.curva .agora { stroke: var(--text); stroke-dasharray: 3 3; }
+.sinal { display: inline-block; font-size: .75rem; font-weight: 600; border-radius: 999px; padding: 2px 8px; }
+.sinal.comprar { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
+.sinal.vender { background: color-mix(in srgb, var(--down) 18%, transparent); color: var(--down); }
+.sinal.aguardar, .sinal.sem { background: var(--bg); color: var(--muted); }
+
+/* Previsão no topo */
+.previsao { margin: 10px 0 4px; }
+.previsao h2 { font-size: .95rem; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.previsao h2 .sub { font-weight: 400; }
+.prev-cartoes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .prev-cartoes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .prev-cartoes { grid-template-columns: 1fr; } }
+.prev-cartao {
+  background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--up);
+  border-radius: 12px; padding: 14px 12px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
+}
+.prev-cartao:hover { background: var(--row-hover); }
+.prev-cartao img { width: 56px; height: 56px; }
+.prev-cartao b { font-weight: 600; line-height: 1.25; font-size: .98rem; }
+.prev-precos { font-size: .9rem; font-variant-numeric: tabular-nums; }
+.prev-alta { font-size: 1.5rem; font-weight: 700; color: var(--up); line-height: 1.1; margin: 2px 0; }
+.prev-alta small { font-size: .75rem; font-weight: 400; color: var(--muted); margin-left: 4px; }
+.prev-motivos { font-size: .78rem; color: var(--muted); line-height: 1.35; }
+.prev-cartao.negro { border-top-color: var(--bm); }
+.prev-cartao.negro .prev-alta { color: var(--bm); }
+.prev-rotulo { font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--bm); }
+.prev-nota { font-size: .78rem; color: var(--muted); margin-top: 6px; }
+
+/* Comparar mercados */
+[hidden] { display: none !important; }
+.comparar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.comparar label { display: flex; gap: 6px; align-items: center; font-size: .88rem; color: var(--muted); }
+
+.bm-nota { background: var(--bm-soft); border-radius: 8px; padding: 8px 12px; font-size: .88rem; margin-bottom: 12px; }
+
+footer { color: var(--muted); font-size: .8rem; padding: 24px 0 40px; }
+footer a { color: inherit; }
+
+dialog {
+  border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text);
+  width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0;
+}
+dialog::backdrop { background: rgba(0,0,0,.45); }
+.det-cab { display: flex; gap: 12px; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.det-cab img { width: 64px; height: 64px; }
+.det-cab h2 { margin: 0; font-size: 1.15rem; }
+.det-cab button { margin-left: auto; font: inherit; font-size: 1.4rem; background: none; border: 0; color: var(--muted); cursor: pointer; }
+.det-corpo { padding: 14px 18px 20px; }
+.det-corpo h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 6px; }
+.det-corpo table { min-width: 0; }
+.grafico svg { width: 100%; height: 140px; display: block; }
+.grafico .barra { fill: var(--accent); }
+.grafico .eixo { fill: var(--muted); font-size: 10px; }
+@media (max-width: 600px) {
+  h1 { font-size: 1.3rem; }
+  .det-cab img { width: 48px; height: 48px; }
+  .botao .rotulo { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Albion <span>em Alta</span></h1>
+      <div class="sub" id="status">Carregando…</div>
+    </div>
+    <div class="acoes">
+      <select id="regiao" aria-label="Servidor"></select>
+      <button class="botao" id="atualizar" title="Atualizar dados">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        <span class="rotulo">Atualizar</span>
+      </button>
+      <button class="botao" id="tema" title="Alternar tema">
+        <svg id="tema-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+        <span class="rotulo" id="tema-rotulo"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="bonus-dia" id="bonus-dia" hidden></div>
+
+  <section class="previsao" id="previsao" hidden>
+    <h2>Previsão: tendência de alta <span class="sub" id="prev-sub"></span></h2>
+    <div class="prev-cartoes" id="prev-cartoes"></div>
+    <div class="prev-nota" id="prev-nota"></div>
+  </section>
+
+  <div class="abas" role="group" aria-label="Ranking">
+    <button class="aba" data-aba="alta" aria-pressed="true">Em alta</button>
+    <button class="aba" data-aba="vendidos" aria-pressed="false">Mais vendidos</button>
+    <button class="aba" data-aba="subindo" aria-pressed="false">Preço subindo</button>
+    <button class="aba" data-aba="caindo" aria-pressed="false">Preço caindo</button>
+    <button class="aba" data-aba="agora" aria-pressed="false">Movimento agora</button>
+    <button class="aba" data-aba="comparar" aria-pressed="false">Comparar mercados</button>
+    <button class="aba" data-aba="ciclos" aria-pressed="false">Ciclos semanais</button>
+    <button class="aba bm" data-aba="negro" aria-pressed="false">Mercado Negro</button>
+  </div>
+  <p class="explica" id="explica"></p>
+
+  <div class="comparar" id="comparar" hidden>
+    <label>Comprar em <select id="mercado-a"></select></label>
+    <button class="botao" id="inverter" title="Inverter mercados" aria-label="Inverter mercados">⇄</button>
+    <label>Vender em <select id="mercado-b"></select></label>
+    <label>Ordenar por <select id="ordem-comparar">
+      <option value="lucro_unidade">Lucro por unidade</option>
+      <option value="lucro_pct">Lucro em %</option>
+      <option value="lucro_dia">Lucro x vendas/dia</option>
+    </select></label>
+  </div>
+
+  <div class="comparar" id="ciclos-ctrl" hidden>
+    <div class="chips" role="group" aria-label="Grupo de insumos" id="chips-grupo"></div>
+    <label>Ordenar por <select id="ordem-ciclos">
+      <option value="ciclo">Melhor ciclo (margem × força)</option>
+      <option value="margem">Maior margem</option>
+      <option value="comprar">Bom para comprar agora</option>
+      <option value="vender">Bom para vender agora</option>
+    </select></label>
+  </div>
+
+  <div class="filtros">
+    <input id="busca" type="search" placeholder="Buscar qualquer item (ex.: bolsa, espada, couro)">
+    <select id="cidade" aria-label="Cidade"><option value="">Todas as cidades</option></select>
+    <select id="recente" aria-label="Última venda">
+      <option value="1">Vendido na última 1h</option>
+      <option value="3">Vendido nas últimas 3h</option>
+      <option value="6">Vendido nas últimas 6h</option>
+      <option value="12">Vendido nas últimas 12h</option>
+      <option value="24">Vendido nas últimas 24h</option>
+    </select>
+  </div>
+  <div class="chips-linha">
+    <div class="chips" role="group" aria-label="Tier" id="chips-tier">
+      <span class="chips-rotulo">Tier</span>
+    </div>
+    <div class="chips" role="group" aria-label="Encantamento" id="chips-enc">
+      <span class="chips-rotulo">Encant.</span>
+    </div>
+    <button class="limpar" id="limpar-filtros" hidden>Limpar filtros</button>
+  </div>
+
+  <div id="aviso" class="aviso" hidden></div>
+  <div id="conteudo"></div>
+
+  <footer>
+    Dados coletados por jogadores através do <a href="https://www.albion-online-data.com/" target="_blank" rel="noopener">Albion Data Project</a>.
+    Itens pouco vistos podem ter dados incompletos. Atualiza sozinho a cada minuto.
+  </footer>
+</div>
+
+<dialog id="detalhe">
+  <div class="det-cab">
+    <img id="det-img" alt="">
+    <div><h2 id="det-nome"></h2><div class="tag" id="det-id"></div></div>
+    <button id="det-fechar" aria-label="Fechar">×</button>
+  </div>
+  <div class="det-corpo">
+    <div class="det-abas" role="group" aria-label="Detalhe">
+      <button class="aba" data-det="mercado" aria-pressed="true">Mercado</button>
+      <button class="aba" data-det="craft" aria-pressed="false">Fabricação</button>
+      <button class="aba" data-det="ciclo" aria-pressed="false">Ciclo semanal</button>
+    </div>
+    <div id="det-mercado"></div>
+    <div id="det-craft" hidden></div>
+    <div id="det-ciclo" hidden></div>
+  </div>
+</dialog>
+
+<script>
+const LIMITE = 20;          // itens por ranking
+const LIMITE_BUSCA = 30;    // resultados de busca
+const TOP_NEGRO = 5;        // itens na aba Mercado Negro
+const MERCADO_NEGRO = 3003;
+
+const ABAS = {
+  alta: {
+    texto: "Os 20 itens vendendo mais acima do normal nas últimas 24h, comparado com a média diária dos 7 dias anteriores.",
+    ordenar: i => i.indice, filtro: i => i.indice > 0,
+    colunas: ["vendas_24h", "crescimento", "prata_24h", "preco_medio_24h", "var_preco"],
+  },
+  vendidos: {
+    texto: "Os 20 itens que mais movimentaram prata nas últimas 24h.",
+    ordenar: i => i.prata_24h, filtro: () => true,
+    colunas: ["vendas_24h", "prata_24h", "preco_medio_24h", "crescimento", "var_preco"],
+  },
+  subindo: {
+    texto: "Os 20 itens com maior alta de preço: média das últimas 24h contra os 7 dias anteriores.",
+    ordenar: i => i.var_preco, filtro: i => i.var_preco > 0 && i.vendas_24h >= 20,
+    colunas: ["var_preco", "preco_medio_24h", "vendas_24h", "menor_venda", "maior_compra"],
+  },
+  caindo: {
+    texto: "Os 20 itens com maior queda de preço: média das últimas 24h contra os 7 dias anteriores.",
+    ordenar: i => -i.var_preco, filtro: i => i.var_preco < 0 && i.vendas_24h >= 20,
+    colunas: ["var_preco", "preco_medio_24h", "vendas_24h", "menor_venda", "maior_compra"],
+  },
+  agora: {
+    texto: "Os 20 itens com mais ordens novas na última hora, comparado com o ritmo normal por hora.",
+    ordenar: i => i.ritmo_ordens ?? i.novas_ordens_1h / 1000, filtro: i => i.novas_ordens_1h >= 5,
+    colunas: ["novas_ordens_1h", "ritmo_ordens", "vendas_3h", "menor_venda", "maior_compra"],
+  },
+  comparar: {
+    texto: "Mesmo item em dois mercados: preço médio dos últimos 3 dias (qualidade Normal). Lucro já desconta 6,5% de taxas (4% de imposto com premium + 2,5% de anúncio).",
+  },
+  ciclos: {
+    texto: "Insumos com ciclo semanal de preço: quando costuma ser o fundo (comprar) e o pico (vender). Curva extraída por decomposição STL das últimas 4 semanas; previsão por Holt-Winters.",
+  },
+  negro: {
+    texto: "Os 5 itens mais em alta no Mercado Negro (Caerleon): o que os NPCs estão comprando acima do normal nas últimas 24h.",
+  },
+};
+
+const COLUNAS_BUSCA = ["vendas_24h", "prata_24h", "preco_medio_24h", "crescimento", "var_preco"];
+
+const vezes = v => v == null ? "–" : `<span class="${v >= 1 ? "up" : "down"}">${v.toLocaleString("pt-BR", {maximumFractionDigits: 1})}x</span>`;
+const porcento = v => v == null ? "–" : `<span class="${v >= 0 ? "up" : "down"}">${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR")}%</span>`;
+const COLUNAS = {
+  vendas_24h: ["Vendas 24h", v => fmt(v)],
+  vendas_3h: ["Vendas 3h", v => fmt(v)],
+  prata_24h: ["Prata 24h", v => fmtCurto(v)],
+  preco_medio_24h: ["Preço médio", v => fmt(v)],
+  crescimento: ["x Normal", vezes],
+  var_preco: ["Var. preço", porcento],
+  menor_venda: ["Menor venda", v => fmt(v)],
+  maior_compra: ["Maior compra", v => fmt(v)],
+  novas_ordens_1h: ["Ordens 1h", v => fmt(v)],
+  ritmo_ordens: ["x Ritmo", vezes],
+};
+
+const $ = id => document.getElementById(id);
+const estado = {
+  regiao: "west", aba: "alta", cidade: "",
+  dados: null, negro: null, busca: null, cidades: [],
+  tiers: new Set(JSON.parse(ler("tiers") || "[]")),
+  encs: new Set(JSON.parse(ler("encs") || "[]")),
+  recente: ler("recente") || "12",
+  mercadoA: ler("mercadoA") || "3008", mercadoB: ler("mercadoB") || "2004", comparacao: null,
+};
+
+function fmt(v) { return v == null ? "–" : Math.round(v).toLocaleString("pt-BR"); }
+function fmtCurto(v) {
+  if (v == null) return "–";
+  if (v >= 1e9) return (v / 1e9).toLocaleString("pt-BR", {maximumFractionDigits: 1}) + " bi";
+  if (v >= 1e6) return (v / 1e6).toLocaleString("pt-BR", {maximumFractionDigits: 1}) + " mi";
+  if (v >= 1e3) return (v / 1e3).toLocaleString("pt-BR", {maximumFractionDigits: 0}) + " mil";
+  return fmt(v);
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function icone(id, tam = 64) { return `https://render.albiononline.com/v1/item/${encodeURIComponent(id)}.png?size=${tam}`; }
+function tempoAtras(ts) {
+  const s = Math.max(0, Date.now() / 1000 - ts);
+  if (s < 90) return "agora";
+  if (s < 3600) return `há ${Math.round(s / 60)} min`;
+  if (s < 86400) return `há ${Math.round(s / 3600)} h`;
+  return `há ${Math.round(s / 86400)} dias`;
+}
+function semAcento(s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+function tierTxt(i) { return i.tier ? `T${i.tier}.${i.enc}` : ""; }
+function guardar(chave, valor) { try { localStorage.setItem(chave, valor); } catch (e) {} }
+function ler(chave) { try { return localStorage.getItem(chave); } catch (e) { return null; } }
+async function obter(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+/* ---------- tema ---------- */
+const ICONE_SOL = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+const ICONE_LUA = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+function temaAtual() {
+  return document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+}
+function mostrarBotaoTema() {
+  const escuro = temaAtual() === "dark";
+  // O botão mostra o tema para o qual vai trocar
+  $("tema-icone").innerHTML = escuro ? ICONE_SOL : ICONE_LUA;
+  $("tema-rotulo").textContent = escuro ? "Tema claro" : "Tema escuro";
+}
+$("tema").addEventListener("click", () => {
+  const novo = temaAtual() === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = novo;
+  guardar("tema", novo);
+  mostrarBotaoTema();
+});
+mostrarBotaoTema();
+
+/* ---------- carga de dados ---------- */
+estado.regiao = ler("regiao") || estado.regiao;
+estado.cidade = ler("cidade") || "";
+
+async function iniciar() {
+  const [regioes, cidades] = await Promise.all([obter("/api/regioes"), obter("/api/cidades")]);
+  $("regiao").innerHTML = regioes.map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join("");
+  $("regiao").value = estado.regiao;
+  estado.cidades = cidades;
+  for (const c of cidades) $("cidade").add(new Option(c.nome, c.id));
+  $("cidade").value = estado.cidade;
+  for (const sel of ["mercado-a", "mercado-b"])
+    for (const c of cidades) $(sel).add(new Option(c.nome, c.id));
+  $("mercado-a").value = estado.mercadoA;
+  $("mercado-b").value = estado.mercadoB;
+  criarChips("chips-tier", [1, 2, 3, 4, 5, 6, 7, 8], t => `T${t}`, estado.tiers, "tiers");
+  criarChips("chips-enc", [0, 1, 2, 3, 4], e => `.${e}`, estado.encs, "encs");
+  $("recente").value = estado.recente;
+  mostrarLimpar();
+  await carregar();
+}
+
+async function carregar() {
+  const botao = $("atualizar");
+  botao.disabled = true; botao.classList.add("girando");
+  try {
+    const cidade = estado.cidade ? `&cidade=${estado.cidade}` : "";
+    const [dados, negro, comparacao] = await Promise.all([
+      obter(`/api/em-alta?regiao=${estado.regiao}${cidade}`),
+      obter(`/api/em-alta?regiao=${estado.regiao}&cidade=${MERCADO_NEGRO}`),
+      obterComparacao(),
+    ]);
+    estado.dados = dados; estado.negro = negro; estado.comparacao = comparacao;
+    carregarPrevisao();
+    carregarBonus();
+    await carregarCiclos();
+    const hora = new Date(dados.gerado_em * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"});
+    $("status").textContent = `${dados.itens.length.toLocaleString("pt-BR")} itens com vendas nas últimas 24h · ${dados.picos_descartados.toLocaleString("pt-BR")} picos de preço fora do padrão ignorados · atualizado às ${hora}`;
+    const aviso = $("aviso");
+    aviso.hidden = dados.movimento_ok;
+    if (!dados.movimento_ok)
+      aviso.textContent = `O coletor começou há ${dados.horas_coleta.toLocaleString("pt-BR")} h. A aba "Movimento agora" precisa de pelo menos 2 h de coleta.`;
+    desenhar();
+  } catch (e) {
+    $("status").textContent = "Não foi possível carregar os dados. Tente atualizar em instantes.";
+  } finally {
+    botao.disabled = false; botao.classList.remove("girando");
+  }
+}
+
+function obterComparacao() {
+  if (estado.mercadoA === estado.mercadoB) return Promise.resolve(null);
+  return obter(`/api/comparar?regiao=${estado.regiao}&a=${estado.mercadoA}&b=${estado.mercadoB}`);
+}
+
+async function trocarMercados() {
+  guardar("mercadoA", estado.mercadoA); guardar("mercadoB", estado.mercadoB);
+  try { estado.comparacao = await obterComparacao(); } catch (e) { estado.comparacao = null; }
+  desenhar();
+}
+
+async function carregarBonus() {
+  const caixa = $("bonus-dia");
+  let b;
+  try { b = await obter(`/api/bonus-do-dia?regiao=${estado.regiao}`); } catch (e) { caixa.hidden = true; return; }
+  if (!b.bonus.length) {
+    caixa.hidden = false;
+    caixa.innerHTML = `<b>Bônus do dia:</b> <span class="sub">ainda não confirmado para este servidor.</span>`;
+    return;
+  }
+  const fim = new Date(Math.min(...b.bonus.map(x => x.termina)) * 1000)
+    .toLocaleString("pt-BR", {weekday: "short", hour: "2-digit", minute: "2-digit"});
+  estado.bonusHoje = Object.fromEntries(b.bonus.map(x => [x.cat, x.valor]));
+  caixa.hidden = false;
+  caixa.innerHTML = `<b>Bônus do dia:</b>` + b.bonus.map(x =>
+    `<span class="bonus-chip"><strong>+${Math.round(x.valor * 100)}%</strong> ${esc(x.nome)}${x.cidades.length ? ` · melhor em ${esc(x.cidades.join(", "))}` : ""}</span>`).join("") +
+    `<span class="sub">até ${fim}</span>`;
+}
+
+async function carregarPrevisao() {
+  const sec = $("previsao");
+  let p;
+  try { p = await obter(`/api/previsao?regiao=${estado.regiao}`); } catch (e) { sec.hidden = true; return; }
+  if (!p.disponivel || !p.itens.length) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const t = p.teste;
+  $("prev-sub").textContent = `próximas ${p.horizonte_h}h`;
+  const cartoes = [...p.itens.map(i => ({...i, negro: false})),
+                   ...(p.mercado_negro ? [{...p.mercado_negro, negro: true}] : [])];
+  $("prev-cartoes").innerHTML = cartoes.map(i => `
+    <div class="prev-cartao${i.negro ? " negro" : ""}" data-id="${esc(i.id)}" role="button" tabindex="0" title="${esc(i.motivos.join(" · "))}">
+      <span class="prev-rotulo"${i.negro ? "" : ' aria-hidden="true" style="visibility:hidden"'}>Mercado Negro</span>
+      <img src="${icone(i.id)}" alt="">
+      <b>${esc(i.nome)}</b>
+      <div class="tag">${tierTxt(i)} · ${esc(i.cidade)}</div>
+      <div class="prev-alta">+${i.alta_prevista.toLocaleString("pt-BR")}%<small>previsto</small></div>
+      <div class="prev-precos">${fmt(i.preco_atual)} → <b>${fmt(i.preco_previsto)}</b></div>
+      <div class="prev-motivos">${i.motivos.map(esc).join("<br>")}</div>
+    </div>`).join("");
+  $("prev-nota").textContent = `Estimativa estatística, não garantia. No teste com os últimos 7 dias, o preço subiu em ${Math.round(t.acerto_top3 * 100)}% das escolhas do top 3 (alta típica de ${(t.alta_mediana_top3 * 100).toLocaleString("pt-BR", {maximumFractionDigits: 1})}%). Sem o modelo, só ${Math.round(t.subiu_sem_modelo * 100)}% dos preços subiam.`;
+}
+
+const ORDEM_COMPARAR = {
+  lucro_unidade: i => i.lucro_unidade,
+  lucro_pct: i => i.lucro_pct,
+  lucro_dia: i => i.lucro_unidade * i.vendas_dia_b,
+};
+const TEXTO_ORDEM = { lucro_unidade: "maior lucro por unidade", lucro_pct: "maior lucro em %", lucro_dia: "maior lucro x vendas por dia" };
+
+function desenharComparacao() {
+  const c = estado.comparacao;
+  const nomeA = nomeCidade(estado.mercadoA), nomeB = nomeCidade(estado.mercadoB);
+  $("explica").textContent = ABAS.comparar.texto;
+  if (!c) {
+    $("conteudo").innerHTML = `<div class="vazio">Escolha dois mercados diferentes.</div>`;
+    return;
+  }
+  const busca = semAcento($("busca").value.trim());
+  const lista = aplicarFiltros(c.itens)
+    .filter(i => !busca || semAcento(i.nome).includes(busca) || i.id.toLowerCase().includes(busca))
+    .sort((a, b) => ORDEM_COMPARAR[$("ordem-comparar").value](b) - ORDEM_COMPARAR[$("ordem-comparar").value](a))
+    .slice(0, LIMITE);
+  const cab = `<th>#</th><th>Item</th><th>Preço ${esc(nomeA)}</th><th>Preço ${esc(nomeB)}</th><th>Diferença</th><th>Lucro/un.</th><th>Vendas/dia ${esc(nomeB)}</th>`;
+  const corpo = lista.length ? lista.map((i, n) => `<tr data-id="${esc(i.id)}">
+      <td class="pos num">${n + 1}</td>
+      <td><div class="item"><img loading="lazy" src="${icone(i.id)}" alt=""><div><b>${esc(i.nome)}</b><div class="tag">${tierTxt(i)}</div></div></div></td>
+      <td class="num">${fmt(i.preco_a)}</td><td class="num">${fmt(i.preco_b)}</td>
+      <td class="num">${porcento(i.diferenca)}</td>
+      <td class="num"><span class="${i.lucro_unidade >= 0 ? "up" : "down"}">${fmt(i.lucro_unidade)}</span> <span class="tag">(${i.lucro_pct.toLocaleString("pt-BR")}%)</span></td>
+      <td class="num">${fmt(i.vendas_dia_b)}</td></tr>`).join("")
+    : `<tr><td colspan="7" class="vazio">Nenhum item vendido nos dois mercados com esses filtros.</td></tr>`;
+  $("conteudo").innerHTML = `<div class="tabela"><table><thead><tr>${cab}</tr></thead><tbody>${corpo}</tbody></table></div>
+    <p class="sub">${c.itens.length.toLocaleString("pt-BR")} itens vendidos nos dois mercados (mínimo de 5 vendas por dia em cada). Mostrando os 20 com ${TEXTO_ORDEM[$("ordem-comparar").value]} comprando em ${esc(nomeA)} e vendendo em ${esc(nomeB)}.</p>`;
+}
+
+/* ---------- busca no catálogo ---------- */
+let esperaBusca;
+$("busca").addEventListener("input", () => {
+  clearTimeout(esperaBusca);
+  const q = $("busca").value.trim();
+  if (estado.aba === "comparar" || estado.aba === "ciclos" || q.length < 2) { estado.busca = null; desenhar(); return; }
+  esperaBusca = setTimeout(async () => {
+    try {
+      const achados = await obter(`/api/busca?q=${encodeURIComponent(q)}&limite=100`);
+      if ($("busca").value.trim() === q) { estado.busca = achados; desenhar(); }
+    } catch (e) {}
+  }, 250);
+});
+
+/* ---------- desenho ---------- */
+function criarChips(id, valores, rotulo, conjunto, chave) {
+  const caixa = $(id);
+  for (const v of valores) {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = rotulo(v);
+    b.setAttribute("aria-pressed", conjunto.has(v));
+    b.addEventListener("click", () => {
+      conjunto.has(v) ? conjunto.delete(v) : conjunto.add(v);
+      b.setAttribute("aria-pressed", conjunto.has(v));
+      guardar(chave, JSON.stringify([...conjunto]));
+      mostrarLimpar();
+      desenhar();
+    });
+    caixa.appendChild(b);
+  }
+}
+
+function mostrarLimpar() {
+  $("limpar-filtros").hidden = !estado.tiers.size && !estado.encs.size;
+}
+
+// Nenhum chip marcado = todos. Itens sem venda recente ficam de fora
+// (a busca mostra todos, porque a pessoa procurou o item de propósito).
+function aplicarFiltros(lista, { recente = true } = {}) {
+  const limite = Date.now() / 1000 - Number(estado.recente) * 3600;
+  return lista
+    .filter(i => !estado.tiers.size || estado.tiers.has(i.tier))
+    .filter(i => !estado.encs.size || estado.encs.has(i.enc))
+    .filter(i => !recente || i.ultima_venda == null || i.ultima_venda >= limite);
+}
+
+function linhaTabela(i, n, colunas) {
+  const sub = [tierTxt(i), i.ultima_venda ? `última venda ${tempoAtras(i.ultima_venda)}` : "sem vendas recentes"].filter(Boolean).join(" · ");
+  return `<tr data-id="${esc(i.id)}">
+    <td class="pos num">${n + 1}</td>
+    <td><div class="item"><img loading="lazy" src="${icone(i.id)}" alt=""><div><b>${esc(i.nome)}</b><div class="tag">${sub}</div></div></div></td>
+    ${colunas.map(c => `<td class="num">${COLUNAS[c][1](i[c])}</td>`).join("")}
+  </tr>`;
+}
+
+function tabela(lista, colunas, vazio) {
+  const cab = `<th>#</th><th>Item</th>` + colunas.map(c => `<th>${COLUNAS[c][0]}</th>`).join("");
+  const corpo = lista.length ? lista.map((i, n) => linhaTabela(i, n, colunas)).join("")
+    : `<tr><td colspan="${colunas.length + 2}" class="vazio">${vazio}</td></tr>`;
+  return `<div class="tabela"><table><thead><tr>${cab}</tr></thead><tbody>${corpo}</tbody></table></div>`;
+}
+
+function desenharBusca() {
+  // Junta o catálogo com as estatísticas do ranking (quando o item vendeu)
+  const stats = new Map(estado.dados.itens.map(i => [i.id, i]));
+  const lista = aplicarFiltros(estado.busca, { recente: false })
+    .map(i => stats.get(i.id) || i)
+    .sort((a, b) => (b.prata_24h || 0) - (a.prata_24h || 0))
+    .slice(0, LIMITE_BUSCA);
+  const cidade = estado.cidade ? ` em ${nomeCidade(estado.cidade)}` : "";
+  $("explica").textContent = `Resultados da busca${cidade}, ordenados por prata movimentada em 24h.`;
+  $("conteudo").innerHTML = tabela(lista, COLUNAS_BUSCA, "Nenhum item encontrado com esse nome.");
+}
+
+function desenharNegro() {
+  const itens = aplicarFiltros(estado.negro.itens)
+    .sort((a, b) => (b.indice - a.indice) || (b.prata_24h - a.prata_24h))
+    .slice(0, TOP_NEGRO);
+  $("explica").textContent = ABAS.negro.texto;
+  if (!itens.length) {
+    $("conteudo").innerHTML = `<div class="vazio">Sem vendas no Mercado Negro com esses filtros ainda.</div>`;
+    return;
+  }
+  $("conteudo").innerHTML = `
+    <div class="bm-nota">O Mercado Negro fica em Caerleon e só compra itens dos jogadores. Itens em alta aqui costumam render bem para quem fabrica ou transporta até lá.</div>
+    <div class="cartoes">${itens.map((i, n) => `
+      <div class="cartao" data-id="${esc(i.id)}" role="button" tabindex="0">
+        <div class="topo">
+          <span class="pos">${n + 1}</span>
+          <img src="${icone(i.id)}" alt="">
+          <div><b>${esc(i.nome)}</b><div class="tag">${tierTxt(i)}</div></div>
+        </div>
+        <dl>
+          <dt>Vendas 24h</dt><dd>${fmt(i.vendas_24h)}</dd>
+          <dt>x Normal</dt><dd>${vezes(i.crescimento)}</dd>
+          <dt>Preço médio</dt><dd>${fmt(i.preco_medio_24h)}</dd>
+          <dt>Var. preço</dt><dd>${porcento(i.var_preco)}</dd>
+          <dt>Prata 24h</dt><dd>${fmtCurto(i.prata_24h)}</dd>
+        </dl>
+      </div>`).join("")}
+    </div>`;
+}
+
+function nomeCidade(id) { return (estado.cidades.find(c => c.id == id) || {}).nome || ""; }
+
+function desenhar() {
+  if (!estado.dados) return;
+  const negro = estado.aba === "negro", comparar = estado.aba === "comparar";
+  $("cidade").hidden = negro || comparar;
+  $("comparar").hidden = !comparar;
+  const ciclosAba = estado.aba === "ciclos";
+  $("ciclos-ctrl").hidden = !ciclosAba;
+  $("recente").hidden = ciclosAba || comparar;
+  if (comparar) return desenharComparacao();
+  if (ciclosAba) return desenharCiclos();
+  if (estado.busca) return desenharBusca();
+  if (negro) return desenharNegro();
+
+  const cfg = ABAS[estado.aba];
+  const cidade = estado.cidade ? ` Cidade: ${nomeCidade(estado.cidade)}.` : "";
+  $("explica").textContent = cfg.texto + cidade;
+  const lista = aplicarFiltros(estado.dados.itens)
+    .filter(cfg.filtro)
+    .sort((a, b) => (cfg.ordenar(b) ?? -Infinity) - (cfg.ordenar(a) ?? -Infinity))
+    .slice(0, LIMITE);
+  $("conteudo").innerHTML = tabela(lista, cfg.colunas, "Nenhum item encontrado com esses filtros ainda.");
+}
+
+/* ---------- detalhe do item ---------- */
+function graficoBarras(pontos, rotulo) {
+  if (!pontos.length) return `<p class="sub">Sem dados.</p>`;
+  const W = 700, H = 140, base = 120, max = Math.max(...pontos.map(p => p.quantidade), 1);
+  const larg = W / pontos.length;
+  const barras = pontos.map((p, i) => {
+    const h = Math.max(1, (p.quantidade / max) * (base - 10));
+    return `<rect class="barra" x="${i * larg + 1}" y="${base - h}" width="${Math.max(1, larg - 2)}" height="${h}" rx="2"><title>${rotulo(p)}: ${fmt(p.quantidade)} vendidos · média ${fmt(p.prata / p.quantidade)}</title></rect>`;
+  }).join("");
+  const passo = Math.ceil(pontos.length / 6);
+  const eixo = pontos.map((p, i) => i % passo ? "" : `<text class="eixo" x="${i * larg + larg / 2}" y="${H - 4}" text-anchor="middle">${rotulo(p)}</text>`).join("");
+  return `<div class="grafico"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">${barras}${eixo}</svg></div>`;
+}
+
+function trocarAbaDetalhe(qual) {
+  document.querySelectorAll("[data-det]").forEach(b => b.setAttribute("aria-pressed", b.dataset.det === qual));
+  $("det-mercado").hidden = qual !== "mercado";
+  $("det-craft").hidden = qual !== "craft";
+  $("det-ciclo").hidden = qual !== "ciclo";
+}
+
+async function abrirItem(id) {
+  const dlg = $("detalhe");
+  $("det-img").src = icone(id, 128);
+  $("det-nome").textContent = "Carregando…";
+  $("det-id").textContent = id;
+  $("det-mercado").innerHTML = "";
+  $("det-craft").innerHTML = `<p class="sub">Carregando receita…</p>`;
+  trocarAbaDetalhe("mercado");
+  dlg.showModal();
+  carregarCraft(id);
+  carregarCicloItem(id);
+  let d;
+  try { d = await obter(`/api/item/${estado.regiao}/${encodeURIComponent(id)}`); }
+  catch (e) { $("det-nome").textContent = "Não foi possível carregar o item."; return; }
+  $("det-nome").textContent = d.nome;
+  $("det-id").textContent = `${id} · ${tierTxt(d)}`;
+  const hora = p => new Date(p.ts * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit"}) + "h";
+  const dia = p => new Date(p.dia * 1000).toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit", timeZone: "UTC"});
+  const cidades = d.cidades.filter(c => c.principal || c.vendas_24h);
+  $("det-mercado").innerHTML = `
+    <h3>Vendas por hora (24h)</h3>${graficoBarras(d.horas, hora)}
+    <h3>Vendas por dia (4 semanas)</h3>${graficoBarras(d.dias, dia)}
+    <h3>Por cidade</h3>
+    <div class="tabela"><table>
+      <thead><tr><th>Cidade</th><th>Vendas 24h</th><th>Preço médio</th><th>Menor venda</th><th>Maior compra</th></tr></thead>
+      <tbody>${cidades.length ? cidades.map(c => `<tr>
+        <td>${esc(c.nome)}</td><td class="num">${fmt(c.vendas_24h)}</td>
+        <td class="num">${c.vendas_24h ? fmt(c.prata_24h / c.vendas_24h) : "–"}</td>
+        <td class="num">${fmt(c.menor_venda)}</td><td class="num">${fmt(c.maior_compra)}</td></tr>`).join("")
+        : `<tr><td colspan="5" class="vazio">Sem dados por cidade ainda.</td></tr>`}</tbody>
+    </table></div>
+    <p class="sub">${d.picos_descartados ? `${d.picos_descartados} pontos com preço fora do padrão (mais de 3x acima ou abaixo do normal) foram ignorados nos gráficos. ` : ""}Menor venda e maior compra consideram ordens de qualidade Normal e Boa vistas nas últimas 6h.</p>`;
+}
+
+/* ---------- fabricação ---------- */
+const TAXA_VENDA = 0.065;
+estado.taxaEstacao = Number(ler("taxaEstacao") || 500);
+estado.usarFoco = ler("usarFoco") === "1";
+
+async function carregarCraft(id) {
+  try { estado.craft = await obter(`/api/craft/${estado.regiao}/${encodeURIComponent(id)}`); }
+  catch (e) { $("det-craft").innerHTML = `<p class="sub">Não foi possível carregar a receita.</p>`; return; }
+  desenharCraft();
+}
+
+function pctTxt(v, casas = 1) { return `${(v * 100).toLocaleString("pt-BR", {maximumFractionDigits: casas})}%`; }
+
+function linhaMaterial(m) {
+  const extra = m.retorna ? "" : `<span class="selo">não retorna</span>`;
+  return `<tr>
+    <td><img class="mini" src="${icone(m.id, 64)}" alt="">${esc(m.nome)} <span class="tag">${tierTxt(m)}</span>${extra}</td>
+    <td class="num">${fmt(m.qtd)}</td>
+    <td class="num">${fmt(m.preco)}</td>
+    <td>${esc(m.cidade || "sem preço")}</td>
+    <td class="num">${fmt(m.subtotal)}</td></tr>`;
+}
+
+function desenharCraft() {
+  const c = estado.craft, caixa = $("det-craft");
+  if (!c.fabricavel) {
+    caixa.innerHTML = `<p class="sub">Este item não é fabricado nem refinado: ele é coletado, obtido em atividades ou comprado de NPC.</p>`;
+    return;
+  }
+  const foco = estado.usarFoco, taxa = estado.taxaEstacao;
+  const taxaEstacao = c.nutricao * taxa / 100 / c.qtd_fabricada;
+  const verbo = c.refino ? "refinar" : "fabricar";
+
+  const cidades = c.cidades.map(x => {
+    const materiais = foco ? x.custo_materiais_foco : x.custo_materiais;
+    const total = materiais == null ? null : materiais + taxaEstacao + c.prata_receita;
+    const lucro = total != null && x.preco_venda ? x.preco_venda * (1 - TAXA_VENDA) - total : null;
+    return {...x, materiais, total, lucro};
+  });
+  const melhor = cidades.filter(x => x.total != null).sort((a, b) => a.total - b.total)[0];
+
+  const bonusHoje = c.bonus_hoje ? `<span class="selo">bônus do dia +${Math.round(c.bonus_hoje * 100)}%</span>` : "";
+  caixa.innerHTML = `
+    <p class="sub">Categoria: <b>${esc(c.nome_categoria)}</b>${bonusHoje}${c.qtd_fabricada > 1 ? ` · rende ${c.qtd_fabricada} por fabricação` : ""}</p>
+    <div class="craft-opcoes">
+      <label>Taxa da estação <input type="number" id="taxa-estacao" min="0" step="50" value="${taxa}"> prata / 100 nutrição</label>
+      <label><input type="checkbox" id="usar-foco" ${foco ? "checked" : ""}> Usar foco</label>
+    </div>
+
+    <h3>Materiais</h3>
+    <div class="tabela"><table>
+      <thead><tr><th>Material</th><th>Qtd.</th><th>Preço un.</th><th>Mais barato em</th><th>Subtotal</th></tr></thead>
+      <tbody>${c.materiais.map(linhaMaterial).join("")}</tbody>
+    </table></div>
+
+    <div class="resumo">
+      <div><span>Comprando tudo</span><b>${fmt(c.custo_compra)}</b></div>
+      <div><span>Valor do item</span><b>${fmt(c.valor_item)}</b></div>
+      <div><span>Nutrição gasta</span><b>${c.nutricao.toLocaleString("pt-BR")}</b></div>
+      <div><span>Taxa da estação</span><b>${fmt(taxaEstacao)}</b></div>
+      ${melhor ? `<div><span>Melhor lugar para ${verbo}</span><b>${esc(melhor.nome)}</b></div>` : ""}
+    </div>
+    ${c.materiais_completos ? "" : `<p class="sub">Falta preço de algum material, então os custos ficam incompletos.</p>`}
+
+    <h3>Onde ${verbo}${foco ? " (com foco)" : ""}</h3>
+    <div class="tabela"><table>
+      <thead><tr><th>Cidade</th><th>Bônus</th><th>Retorno</th><th>Materiais</th><th>Taxa</th><th>Custo total</th><th>Venda</th><th>Lucro</th></tr></thead>
+      <tbody>${cidades.map(x => `<tr class="${x === melhor ? "melhor" : ""}">
+        <td>${esc(x.nome)}${x.especialidade ? `<span class="selo">+${Math.round(x.especialidade * 100)}% especialidade</span>` : ""}${x.bonus_dia ? `<span class="selo">+${Math.round(x.bonus_dia * 100)}% hoje</span>` : ""}</td>
+        <td class="num">${pctTxt(foco ? x.bonus_foco : x.bonus, 0)}</td>
+        <td class="num">${pctTxt(foco ? x.retorno_foco : x.retorno)}</td>
+        <td class="num">${fmt(x.materiais)}</td>
+        <td class="num">${fmt(taxaEstacao)}</td>
+        <td class="num">${fmt(x.total)}</td>
+        <td class="num">${fmt(x.preco_venda)}</td>
+        <td class="num">${x.lucro == null ? "–" : `<span class="${x.lucro >= 0 ? "up" : "down"}">${fmt(x.lucro)}</span>`}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <p class="sub">Bônus = base da cidade + especialidade + bônus do dia${foco ? " + 59% do foco" : ""}. Retorno = parte dos materiais devolvida (artefatos e tokens não voltam). Lucro desconta 6,5% de taxas de venda. Descansos de Artur, Merlin e Morgana não têm mercado no site, então ficam sem preço de venda.</p>
+
+    ${c.refino_materiais.length ? `<h3>Refino dos materiais</h3>` + c.refino_materiais.map(r => {
+      const taxaRef = r.valor * 0.1125 * taxa / 100;
+      const custo = (foco ? r.custo_refinar_foco : r.custo_refinar);
+      const total = custo == null ? null : custo + taxaRef;
+      const compensa = total != null && r.preco_comprar ? total < r.preco_comprar : null;
+      return `<div class="refino-card">
+        <p><img class="mini" src="${icone(r.id, 64)}" alt=""><b>${esc(r.nome)}</b> · melhor em <b>${esc(r.melhor_cidade)}</b>
+          (bônus ${pctTxt(r.bonus + (foco ? 0.59 : 0), 0)}, retorno ${pctTxt(foco ? r.retorno_foco : r.retorno)})</p>
+        <p class="sub">Receita: ${r.materiais.map(m => `${m.qtd}× ${esc(m.nome)} (${fmt(m.preco)}${m.cidade ? " em " + esc(m.cidade) : ""})`).join(" + ")}</p>
+        <p>Refinar sai por <b>${fmt(total)}</b> cada (com taxa de ${fmt(taxaRef)}) · comprar pronto: <b>${fmt(r.preco_comprar)}</b>
+          ${compensa == null ? "" : compensa ? `<span class="up">· compensa refinar</span>` : `<span class="down">· compensa comprar</span>`}</p>
+      </div>`;
+    }).join("") : ""}`;
+
+  $("taxa-estacao").addEventListener("change", e => {
+    estado.taxaEstacao = Math.max(0, Number(e.target.value) || 0);
+    guardar("taxaEstacao", estado.taxaEstacao); desenharCraft();
+  });
+  $("usar-foco").addEventListener("change", e => {
+    estado.usarFoco = e.target.checked; guardar("usarFoco", e.target.checked ? "1" : "0"); desenharCraft();
+  });
+}
+
+/* ---------- ciclos semanais ---------- */
+const BLOCO = 6 * 3600;
+estado.grupo = ler("grupo") || "";
+
+// Rótulo local de uma faixa de 6h da semana (k = 0 é segunda 00h UTC)
+function rotuloFaixa(k, seg) {
+  const d = new Date((seg + k * BLOCO) * 1000);
+  return d.toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "") + " " +
+    d.toLocaleTimeString("pt-BR", {hour: "2-digit"}) + "h";
+}
+function quando(ts) {
+  return new Date(ts * 1000).toLocaleString("pt-BR", {weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit"}).replace(".", "") + "h";
+}
+function proximaVenda(x) {
+  const passos = ((x.faixa_venda - x.faixa_compra + 28) % 28) || 28;
+  return x.proxima_compra + passos * BLOCO;
+}
+const TXT_SINAL = {comprar: "comprar", vender: "vender", aguardar: "aguardar", "sem ciclo": "sem ciclo", "não confirmado": "não confirmado"};
+function seloSinal(s) { return `<span class="sinal ${["comprar", "vender", "aguardar"].includes(s) ? s : "sem"}">${TXT_SINAL[s] || s}</span>`; }
+
+// Gráfico da curva semanal: barras = % acima/abaixo do normal em cada faixa de 6h
+function graficoCurva(perfil, seg, faixaAtual) {
+  const W = 700, H = 150, meio = 70, max = Math.max(...perfil.map(Math.abs), 0.01);
+  const larg = W / 28;
+  const barras = perfil.map((v, k) => {
+    const h = Math.abs(v) / max * 55;
+    const y = v >= 0 ? meio - h : meio;
+    return `<rect class="${v >= 0 ? "pos-barra" : "neg-barra"}" x="${k * larg + 1}" y="${y}" width="${larg - 2}" height="${Math.max(1, h)}" rx="2"><title>${rotuloFaixa(k, seg)}: ${v > 0 ? "+" : ""}${(v * 100).toLocaleString("pt-BR", {maximumFractionDigits: 1})}% vs normal</title></rect>`;
+  }).join("");
+  const eixo = perfil.map((_, k) => k % 4 ? "" : `<text class="eixo" x="${k * larg + 2 * larg}" y="${H - 6}" text-anchor="middle">${rotuloFaixa(k, seg).split(" ")[0]}</text>`).join("");
+  const agora = faixaAtual == null ? "" : `<line class="agora" x1="${faixaAtual * larg + larg / 2}" x2="${faixaAtual * larg + larg / 2}" y1="8" y2="${meio + 60}"><title>agora</title></line>`;
+  return `<div class="curva"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Curva semanal de preço">
+    <line class="zero" x1="0" x2="${W}" y1="${meio}" y2="${meio}"/>${barras}${agora}${eixo}</svg></div>
+    <p class="sub">Verde = abaixo do normal (bom para comprar) · vermelho = acima (bom para vender)${faixaAtual == null ? "" : " · tracejado = agora"}.</p>`;
+}
+
+function graficoPrevisao(pontos) {
+  if (!pontos.length) return "";
+  const W = 700, H = 150, precos = pontos.map(p => p.preco);
+  const min = Math.min(...precos), max = Math.max(...precos), faixa = max - min || 1;
+  const x = i => i / (pontos.length - 1) * (W - 20) + 10;
+  const y = v => 125 - (v - min) / faixa * 105;
+  const linha = pontos.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.preco).toFixed(1)}`).join(" ");
+  const iMin = precos.indexOf(min), iMax = precos.indexOf(max);
+  const marca = (i, cls, txt) => `<circle cx="${x(i)}" cy="${y(precos[i])}" r="4" class="${cls}"><title>${txt}: ${fmt(precos[i])} (${quando(pontos[i].ts)})</title></circle>`;
+  const eixo = pontos.map((p, i) => i % 4 ? "" : `<text class="eixo" x="${x(i)}" y="${H - 4}" text-anchor="middle">${new Date(p.ts * 1000).toLocaleDateString("pt-BR", {weekday: "short"}).replace(".", "")}</text>`).join("");
+  return `<div class="curva"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Previsão de preço">
+    <path class="linha" d="${linha}"/>${marca(iMin, "neg-barra", "Mínimo previsto")}${marca(iMax, "pos-barra", "Máximo previsto")}${eixo}</svg></div>
+    <p class="sub">Mínimo previsto ${fmt(min)} (${quando(pontos[iMin].ts)}) · máximo previsto ${fmt(max)} (${quando(pontos[iMax].ts)}).</p>`;
+}
+
+async function carregarCiclos() {
+  try { estado.ciclos = await obter(`/api/ciclos?regiao=${estado.regiao}`); }
+  catch (e) { estado.ciclos = null; }
+  montarChipsGrupo();
+}
+
+function montarChipsGrupo() {
+  const caixa = $("chips-grupo");
+  if (!estado.ciclos || !estado.ciclos.disponivel) { caixa.innerHTML = ""; return; }
+  const grupos = ["", ...Object.keys(estado.ciclos.grupos)];
+  caixa.innerHTML = grupos.map(g => `<button class="chip" data-grupo="${esc(g)}" aria-pressed="${g === estado.grupo}">${esc(g || "Todos")}</button>`).join("");
+}
+
+function desenharCiclos() {
+  const c = estado.ciclos;
+  $("explica").textContent = ABAS.ciclos.texto;
+  if (!c || !c.disponivel) {
+    $("conteudo").innerHTML = `<div class="vazio">A análise de ciclos ainda não foi gerada para este servidor (rode <code>python ciclos.py</code>).</div>`;
+    return;
+  }
+  const seg = c.seg_ref, r = c.resumo;
+  const cidade = estado.cidade ? Number(estado.cidade) : null;
+  let lista = aplicarFiltros(c.series.map(x => ({...x, id: x.item})), { recente: false })
+    .filter(x => !estado.grupo || x.grupo === estado.grupo)
+    .filter(x => cidade == null || x.local === cidade)
+    .filter(x => { const q = semAcento($("busca").value.trim()); return !q || semAcento(x.nome).includes(q); });
+  const ordem = $("ordem-ciclos").value;
+  const chave = {
+    ciclo: x => x.margem_liquida * x.forca,
+    margem: x => x.margem_liquida,
+    comprar: x => (x.sinal === "comprar" ? 1 : 0) * x.margem_liquida * x.forca,
+    vender: x => (x.sinal === "vender" ? 1 : 0) * x.margem_liquida * x.forca,
+  }[ordem];
+  // Ciclos confirmados na semana de teste vêm sempre antes dos não confirmados
+  const confirmado = x => ["comprar", "vender", "aguardar"].includes(x.sinal) ? 1 : 0;
+  lista = lista.filter(x => x.margem_liquida > 0 && chave(x) > 0)
+    .sort((a, b) => (confirmado(b) - confirmado(a)) || (chave(b) - chave(a))).slice(0, LIMITE);
+
+  const g = estado.grupo ? c.grupos[estado.grupo] : null;
+  const curva = g ? g.perfil : mediaPerfis(Object.values(c.grupos));
+  const kMin = curva.indexOf(Math.min(...curva)), kMax = curva.indexOf(Math.max(...curva));
+  const nome = estado.grupo || "todos os insumos";
+  const pct = v => `${(v * 100).toLocaleString("pt-BR", {maximumFractionDigits: 1})}%`;
+
+  const naoConfiavel = r.estrategia_acerto != null && r.estrategia_acerto < 0.5;
+  $("conteudo").innerHTML = `
+    ${naoConfiavel ? `<div class="aviso"><b>Atenção: nas semanas analisadas, o ciclo semanal não se repetiu de forma confiável.</b>
+      Comprar no "fundo" e vender no "pico" da semana anterior deu lucro em só ${Math.round(r.estrategia_acerto * 100)}% dos casos, e a previsão sazonal errou mais que simplesmente usar o último preço.
+      Use as curvas como referência histórica, não como garantia. Itens só recebem sinal de comprar/vender quando o próprio ciclo se confirmou na semana de teste.</div>` : ""}
+    <div class="ciclo-topo">
+      <div class="painel">
+        <h3>Curva semanal: ${esc(nome)}</h3>
+        ${graficoCurva(curva, seg, null)}
+        <p>Na média, o preço fica mais baixo em <b>${rotuloFaixa(kMin, seg)}</b> (${pct(curva[kMin])}) e mais alto em <b>${rotuloFaixa(kMax, seg)}</b> (+${pct(curva[kMax])}).</p>
+      </div>
+      <div class="painel">
+        <h3>Validação (última semana)</h3>
+        ${r.estrategia_series ? `<p>Comprar no fundo e vender no pico apontados pelas 3 semanas anteriores deu lucro em <b>${Math.round(r.estrategia_acerto * 100)}%</b> de ${r.estrategia_series.toLocaleString("pt-BR")} séries (resultado típico ${r.estrategia_mediana > 0 ? "+" : ""}${pct(r.estrategia_mediana)} já com taxas).</p>` : ""}
+        <p>Erro típico da previsão de 7 dias: Holt-Winters <b>${pct(r.erro_holt_winters)}</b> · repetir a semana anterior ${pct(r.erro_semana_anterior)} · último preço ${pct(r.erro_ultimo_preco)}.</p>
+        <p class="sub">Calculado em ${new Date(c.gerado_em * 1000).toLocaleString("pt-BR")}. Horários no seu fuso.</p>
+      </div>
+    </div>
+    <div class="tabela"><table>
+      <thead><tr><th>#</th><th>Item</th><th>Cidade</th><th>Comprar</th><th>Vender</th><th>Margem hist.</th><th>Força</th><th>Agora</th><th>Vendas/dia</th></tr></thead>
+      <tbody>${lista.length ? lista.map((x, n) => `<tr data-id="${esc(x.item)}">
+        <td class="pos num">${n + 1}</td>
+        <td><div class="item"><img loading="lazy" src="${icone(x.item)}" alt=""><div><b>${esc(x.nome)}</b><div class="tag">${tierTxt(x)} · ${esc(x.grupo)}</div></div></div></td>
+        <td>${esc(x.cidade)}</td>
+        <td>${quando(x.proxima_compra)}</td>
+        <td>${quando(proximaVenda(x))}</td>
+        <td class="num up">+${pct(x.margem_liquida)}</td>
+        <td class="num">${Math.round(x.forca * 100)}%</td>
+        <td>${seloSinal(x.sinal)} <span class="tag">${x.posicao > 0 ? "+" : ""}${pct(x.posicao)} vs EMA</span></td>
+        <td class="num">${fmt(x.vendas_dia)}</td></tr>`).join("")
+        : `<tr><td colspan="9" class="vazio">Nenhum insumo com ciclo lucrativo com esses filtros.</td></tr>`}</tbody>
+    </table></div>
+    <p class="sub">Margem histórica = diferença média entre o pico e o fundo da semana nas últimas 4 semanas, já descontando 6,5% de taxas de venda. Força = quanto da variação do preço é explicada pelo ciclo semanal (0–100%). "Agora" compara o momento atual da semana e o preço com a média móvel exponencial de 3 dias.</p>`;
+}
+
+function mediaPerfis(grupos) {
+  const total = grupos.reduce((s, g) => s + g.series, 0) || 1;
+  return Array.from({length: 28}, (_, k) => grupos.reduce((s, g) => s + g.perfil[k] * g.series, 0) / total);
+}
+
+async function carregarCicloItem(id) {
+  const caixa = $("det-ciclo");
+  caixa.innerHTML = `<p class="sub">Carregando ciclo…</p>`;
+  let d;
+  try { d = await obter(`/api/ciclo/${estado.regiao}/${encodeURIComponent(id)}`); }
+  catch (e) { caixa.innerHTML = `<p class="sub">Não foi possível carregar o ciclo.</p>`; return; }
+  if (!d.cidades.length) {
+    caixa.innerHTML = `<p class="sub">Sem ciclo semanal calculado para este item. A análise cobre insumos (recursos, refinados, comida, poções, peixes, fazenda/ervas e montarias) com pelo menos 20 vendas por dia e 3 semanas de histórico.</p>`;
+    return;
+  }
+  const pct = v => `${(v * 100).toLocaleString("pt-BR", {maximumFractionDigits: 1})}%`;
+  const principal = d.cidades[0];
+  caixa.innerHTML = `
+    <h3>Curva semanal em ${esc(principal.cidade)}</h3>
+    ${graficoCurva(principal.perfil, d.seg_ref, principal.faixa_atual)}
+    <p>Comprar perto de <b>${rotuloFaixa(principal.faixa_compra, d.seg_ref)}</b>, vender perto de <b>${rotuloFaixa(principal.faixa_venda, d.seg_ref)}</b>: margem típica de <b class="up">+${pct(principal.margem_liquida)}</b> já com taxas. Força do ciclo ${Math.round(principal.forca * 100)}%. Agora: ${seloSinal(principal.sinal)}</p>
+    <h3>Previsão dos próximos 7 dias (Holt-Winters)</h3>
+    ${graficoPrevisao(principal.previsao)}
+    <p class="sub">Preço atual ${fmt(principal.preco_atual)} · EMA de 3 dias ${fmt(principal.ema_3d)}. Na última semana (fora do treino), o erro desta previsão foi de ${pct(principal.erros.holt_winters)} contra ${pct(principal.erros.semana_anterior)} repetindo a semana anterior${principal.estrategia_teste == null ? "" : `; a estratégia fundo→pico rendeu ${principal.estrategia_teste > 0 ? "+" : ""}${pct(principal.estrategia_teste)}`}.</p>
+    <h3>Por cidade</h3>
+    <div class="tabela"><table>
+      <thead><tr><th>Cidade</th><th>Comprar</th><th>Vender</th><th>Margem</th><th>Força</th><th>Agora</th><th>Vendas/dia</th></tr></thead>
+      <tbody>${d.cidades.map(x => `<tr>
+        <td>${esc(x.cidade)}</td><td>${rotuloFaixa(x.faixa_compra, d.seg_ref)}</td><td>${rotuloFaixa(x.faixa_venda, d.seg_ref)}</td>
+        <td class="num up">+${pct(x.margem_liquida)}</td><td class="num">${Math.round(x.forca * 100)}%</td>
+        <td>${seloSinal(x.sinal)}</td><td class="num">${fmt(x.vendas_dia)}</td></tr>`).join("")}</tbody>
+    </table></div>`;
+}
+
+/* ---------- eventos ---------- */
+$("chips-grupo").addEventListener("click", e => {
+  const b = e.target.closest("[data-grupo]");
+  if (!b) return;
+  estado.grupo = b.dataset.grupo; guardar("grupo", estado.grupo);
+  montarChipsGrupo(); desenhar();
+});
+$("ordem-ciclos").addEventListener("input", desenhar);
+document.querySelectorAll("[data-det]").forEach(b => b.addEventListener("click", () => trocarAbaDetalhe(b.dataset.det)));
+document.querySelectorAll(".abas .aba").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".abas .aba").forEach(x => x.setAttribute("aria-pressed", x === b));
+  estado.aba = b.dataset.aba;
+  // Trocar de aba sai da busca
+  $("busca").value = ""; estado.busca = null;
+  desenhar();
+}));
+$("ordem-comparar").addEventListener("input", desenhar);
+$("recente").addEventListener("change", e => {
+  estado.recente = e.target.value; guardar("recente", estado.recente); desenhar();
+});
+$("limpar-filtros").addEventListener("click", () => {
+  estado.tiers.clear(); estado.encs.clear();
+  guardar("tiers", "[]"); guardar("encs", "[]");
+  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", "false"));
+  mostrarLimpar(); desenhar();
+});
+$("cidade").addEventListener("change", e => {
+  estado.cidade = e.target.value;
+  guardar("cidade", estado.cidade);
+  carregar();
+});
+$("regiao").addEventListener("change", e => {
+  estado.regiao = e.target.value;
+  guardar("regiao", estado.regiao);
+  carregar();
+});
+$("atualizar").addEventListener("click", carregar);
+$("mercado-a").addEventListener("change", e => { estado.mercadoA = e.target.value; trocarMercados(); });
+$("mercado-b").addEventListener("change", e => { estado.mercadoB = e.target.value; trocarMercados(); });
+$("inverter").addEventListener("click", () => {
+  [estado.mercadoA, estado.mercadoB] = [estado.mercadoB, estado.mercadoA];
+  $("mercado-a").value = estado.mercadoA; $("mercado-b").value = estado.mercadoB;
+  trocarMercados();
+});
+for (const ev of ["click", "keydown"])
+  $("prev-cartoes").addEventListener(ev, e => {
+    if (ev === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+    const alvo = e.target.closest("[data-id]");
+    if (alvo) { e.preventDefault(); abrirItem(alvo.dataset.id); }
+  });
+$("conteudo").addEventListener("click", e => {
+  const alvo = e.target.closest("[data-id]");
+  if (alvo) abrirItem(alvo.dataset.id);
+});
+$("conteudo").addEventListener("keydown", e => {
+  const alvo = e.target.closest(".cartao[data-id]");
+  if (alvo && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrirItem(alvo.dataset.id); }
+});
+$("det-fechar").addEventListener("click", () => $("detalhe").close());
+$("detalhe").addEventListener("click", e => { if (e.target === $("detalhe")) $("detalhe").close(); });
+
+iniciar();
+setInterval(carregar, 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+nats-py
+fastapi
+uvicorn
+httpx
+numpy
+statsmodels

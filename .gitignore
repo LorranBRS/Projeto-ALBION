@@ -1,0 +1,10 @@
+# Ambiente Python
+.venv/
+__pycache__/
+*.pyc
+
+# Dados gerados (banco SQLite, logs, caches e arquivos baixados): recriados pelos scripts
+dados/
+
+# Configuração local do editor/assistente
+.claude/
