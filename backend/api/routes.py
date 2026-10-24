@@ -294,9 +294,15 @@ def previsao_item(item_id: str, regiao: str = Query("west"), cidade: int | None 
 
 @router.get("/crafting/opportunities")
 def oportunidades(regiao: str = Query("west"), limite: int = Query(20, ge=1, le=100)):
-    srv = _servidor()
     if regiao not in REGIOES:
         raise HTTPException(404, "Região inválida")
+    lt, itens = calcular_oportunidades(regiao)
+    return {"gerado_em": lt["gerado_em"], "margem_minima": MARGEM_MINIMA,
+            "total": len(itens), "itens": itens[:limite]}
+
+
+def calcular_oportunidades(regiao, margem_minima=MARGEM_MINIMA):
+    srv = _servidor()
     lt = lote(regiao)
     # Preço e z-score mais recentes de cada item por cidade
     por_item = {}
@@ -335,7 +341,7 @@ def oportunidades(regiao: str = Query("west"), limite: int = Query(20, ge=1, le=
                 continue
             razao = melhor_venda["preco_atual"] / custo
             zs = [m["z_score_14d"] for m in materiais if m["z_score_14d"] is not None]
-            if razao <= MARGEM_MINIMA or not zs:
+            if razao <= margem_minima or not zs:
                 continue
             info = srv.ref.info(item)
             itens.append({
@@ -346,8 +352,161 @@ def oportunidades(regiao: str = Query("west"), limite: int = Query(20, ge=1, le=
                 "cost_theoretical": round(custo), "crafting_margin_ratio": round(razao, 3),
                 "rrf": round(rrf, 4), "craft_city": oficina["nome"],
                 "insumo_z_min": min(zs), "materiais": materiais,
+                "nutricao": round(rec["valor"] * 0.1125 / rec["qtd_fabricada"], 2),
                 "sinal_item": melhor_venda["sinal"],
             })
     itens.sort(key=lambda x: x["insumo_z_min"])
-    return {"gerado_em": lt["gerado_em"], "margem_minima": MARGEM_MINIMA,
-            "total": len(itens), "itens": itens[:limite]}
+    return lt, itens
+
+
+# --- calculadora pessoal ---------------------------------------------------------
+TAXA_PREMIUM, TAXA_SEM_PREMIUM = 0.065, 0.105   # (4% ou 8% de imposto) + 2,5% de anúncio
+FATIA_LIQUIDEZ = 0.2                             # vender no máx. 20% do volume diário do item
+ROI_MAXIMO = 3.0                                 # acima disso é quase sempre erro de dado
+
+
+def _preco_compra(l):
+    """Conservador: o maior entre o preço atual e a média de 14 dias (ignora quedas isoladas)."""
+    return max(v for v in (l["preco_atual"], l.get("sma_14d")) if v)
+
+
+def _preco_venda(l):
+    """Conservador: o menor entre o preço atual e a média de 14 dias (ignora picos isolados)."""
+    return min(v for v in (l["preco_atual"], l.get("sma_14d")) if v)
+
+
+def _plano(tipo, item, nome, tier, enc, compra, venda, preco_compra, receita_unit,
+           vendas_dia, prata, max_fatia, prazo, confianca, detalhe, pessimista_unit=None):
+    """Quantidade limitada pela prata, pela fatia máxima por item e pela liquidez."""
+    if preco_compra <= 0 or receita_unit <= preco_compra:
+        return None
+    if receita_unit / preco_compra - 1 > ROI_MAXIMO:
+        return None
+    limite_prata = prata * max_fatia
+    limite_liquidez = max(1, int((vendas_dia or 0) * FATIA_LIQUIDEZ))
+    qtd = int(min(limite_prata // preco_compra, limite_liquidez))
+    if qtd < 1:
+        return None
+    lucro_unit = receita_unit - preco_compra
+    return {
+        "tipo": tipo, "item": item, "nome": nome, "tier": tier, "enc": enc,
+        "compra": compra, "venda": venda, "qtd": qtd,
+        "preco_compra": round(preco_compra), "receita_unit": round(receita_unit),
+        "investimento": round(qtd * preco_compra), "lucro": round(qtd * lucro_unit),
+        "lucro_pessimista": round(qtd * (pessimista_unit - preco_compra)) if pessimista_unit else None,
+        "roi": round(lucro_unit / preco_compra, 4), "prazo": prazo, "confianca": confianca,
+        "limitado_por": "liquidez" if qtd == limite_liquidez and limite_liquidez < limite_prata // preco_compra else "prata",
+        "detalhe": detalhe,
+    }
+
+
+@router.get("/calculadora")
+def calculadora(regiao: str = Query("west"),
+                prata: float = Query(..., gt=0, description="prata disponível"),
+                premium: bool = Query(True),
+                taxa_estacao: float = Query(500, ge=0, description="prata por 100 de nutrição"),
+                max_fatia: float = Query(0.25, gt=0, le=1, description="fração máxima da prata por item"),
+                estrategias: str = Query("revenda,fabricar,segurar"),
+                comprar_em: int | None = Query(None, description="só comprar nesta cidade"),
+                tier_min: int = Query(0, ge=0, le=8)):
+    """O que dá para fazer com a prata informada: planos ordenados por lucro e carteira sugerida."""
+    if regiao not in REGIOES:
+        raise HTTPException(404, "Região inválida")
+    srv = _servidor()
+    taxa = TAXA_PREMIUM if premium else TAXA_SEM_PREMIUM
+    tipos = set(estrategias.split(","))
+    lt = lote(regiao)
+    por_item = {}
+    for l in lt["linhas"]:
+        if l["preco_atual"] and (l["volume_rolling_7d"] or 0) >= 5:
+            por_item.setdefault(l["item"], []).append(l)
+    planos = []
+
+    for item, linhas in por_item.items():
+        info = srv.ref.info(item)
+        if info["tier"] < tier_min:
+            continue
+        # 1) Revenda: comprar na cidade mais barata e vender na mais cara (Mercado Negro só compra)
+        if "revenda" in tipos and len(linhas) >= 2:
+            origens = [l for l in linhas if l["local"] != 3003
+                       and (comprar_em is None or l["local"] == comprar_em)]
+            if origens:
+                o = min(origens, key=_preco_compra)
+                destinos = [l for l in linhas if l["local"] != o["local"]]
+                if destinos:
+                    d = max(destinos, key=_preco_venda)
+                    pc, pv = _preco_compra(o), _preco_venda(d)
+                    p = _plano("revenda", item, info["nome"], info["tier"], info["enc"],
+                               o["cidade"], d["cidade"], pc, pv * (1 - taxa),
+                               d["volume_rolling_7d"], prata, max_fatia, "transporte (horas)", "média",
+                               f"Comprar em {o['cidade']} por ~{round(pc)}, vender em {d['cidade']} "
+                               f"por ~{round(pv)} (menos {taxa:.1%} de taxas)")
+                    if p:
+                        planos.append(p)
+        # 3) Segurar 7 dias: comprar agora e vender depois, se o modelo prevê alta acima das taxas
+        if "segurar" in tipos:
+            for l in linhas:
+                if l["local"] == 3003 or (comprar_em is not None and l["local"] != comprar_em):
+                    continue
+                if l.get("price_pred_7d") is None or (l.get("incerteza_7d") or 1) > 0.4:
+                    continue
+                pc = max(l["preco_atual"], l.get("sell_price_min") or 0)
+                p = _plano("segurar", item, info["nome"], info["tier"], info["enc"],
+                           l["cidade"], l["cidade"], pc, l["price_pred_7d"] * (1 - taxa),
+                           l["volume_rolling_7d"], prata, max_fatia, "7 dias", "baixa",
+                           f"Previsão de 7 dias: {l['price_pred_7d']} (faixa de 80%: "
+                           f"{l['price_pred_7d_lower']} a {l['price_pred_7d_upper']})",
+                           pessimista_unit=l["price_pred_7d_lower"] * (1 - taxa))
+                if p:
+                    planos.append(p)
+
+    # 2) Fabricar: custo teórico + taxa da estação
+    if "fabricar" in tipos:
+        _, oport = calcular_oportunidades(regiao, margem_minima=1.0)
+        for x in oport:
+            if x["tier"] < tier_min:
+                continue
+            if comprar_em is not None and any(m["cidade"] != CIDADES.get(comprar_em) for m in x["materiais"]):
+                continue
+            custo = x["cost_theoretical"] + x["nutricao"] * taxa_estacao / 100
+            p = _plano("fabricar", x["id"], x["nome"], x["tier"], x["enc"],
+                       ", ".join(sorted({m["cidade"] for m in x["materiais"]})), x["sell_city"],
+                       custo, x["sell_price"] * (1 - taxa), x["vendas_dia"], prata, max_fatia,
+                       "fabricação + venda", "média",
+                       f"Fabricar em {x['craft_city']} (retorno {x['rrf']:.1%}): "
+                       + " + ".join(f"{m['qtd']}× {m['nome']}" for m in x["materiais"]))
+            if p:
+                planos.append(p)
+
+    planos.sort(key=lambda p: -p["lucro"])
+
+    # Carteira: maior lucro (já limitado por prata e liquidez) primeiro, um plano por item
+    carteira, restante, usados = [], prata, set()
+    for p in planos:
+        if p["item"] in usados or restante < p["preco_compra"]:
+            continue
+        qtd = int(min(p["qtd"], restante // p["preco_compra"]))
+        if qtd < 1:
+            continue
+        fator = qtd / p["qtd"]
+        # Não vale ocupar espaço com um plano de lucro desprezível só para gastar o troco
+        if p["lucro"] * fator < max(1000, prata * 0.001):
+            continue
+        carteira.append(p | {"qtd": qtd, "investimento": round(qtd * p["preco_compra"]),
+                             "lucro": round(p["lucro"] * fator),
+                             "lucro_pessimista": round(p["lucro_pessimista"] * fator)
+                             if p["lucro_pessimista"] is not None else None})
+        restante -= qtd * p["preco_compra"]
+        usados.add(p["item"])
+        if len(carteira) >= 12:
+            break
+
+    return {
+        "gerado_em": lt["gerado_em"], "prata": prata, "taxa_venda": taxa,
+        "planos": planos[:30], "total_planos": len(planos),
+        "carteira": carteira,
+        "carteira_resumo": {
+            "investido": round(prata - restante), "sobra": round(restante),
+            "lucro": sum(p["lucro"] for p in carteira),
+        },
+    }

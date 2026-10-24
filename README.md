@@ -102,6 +102,20 @@ backend/api/routes.py           /api/v1/predictions/{item}, /api/v1/signals, /ap
 - Sinais de todos os itens são calculados em lote (cache de 30 min, ~30 s por região) e aparecem como selo
   (verde: oportunidade de compra, vermelho: hora de vender, cinza: estável).
 
+## Minha calculadora (aba "Minha calculadora")
+
+O usuário informa a prata (aceita `2m`, `500k`, `1.000.000`, `750 mil`), se tem premium, a taxa da estação,
+o máximo por item, a cidade de compra, o tier mínimo e as estratégias. A rota `/api/v1/calculadora` monta:
+
+- **Revenda**: comprar na cidade mais barata e vender na mais cara (Mercado Negro só como destino).
+- **Fabricar**: custo teórico + taxa da estação, vender na melhor cidade.
+- **Segurar 7 dias**: previsão de 7 dias do LightGBM (só previsões firmes), com o pior caso da faixa de 80%.
+
+Preços conservadores (compra = maior entre atual e média 14d; venda = menor), taxa de venda 6,5% com premium ou
+10,5% sem, quantidade limitada a 20% do volume diário no destino e à fração máxima por item, retorno acima de 300%
+descartado como erro de dado. A **carteira** escolhe os planos de maior lucro, um por item, até acabar a prata.
+As preferências ficam salvas no navegador.
+
 ## Detalhes dos dados (aprendidos no projeto)
 
 - Preços do NATS e da API já vêm em prata (sem multiplicador).

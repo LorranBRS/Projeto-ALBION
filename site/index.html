@@ -174,6 +174,20 @@ tr.melhor td { background: var(--accent-soft); }
 .serie .proj { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 2 4; }
 .serie .rotulo { fill: var(--muted); font-size: 10px; }
 
+/* Minha calculadora */
+.calc-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 16px; }
+.calc-form label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
+.calc-form input[type=text], .calc-form input[type=number], .calc-form select { color: var(--text); }
+.calc-form .linha-check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+.calc-form .grupo-check { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; }
+.calc-acoes { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.botao.primario { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.estrat { display: inline-block; font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.estrat.revenda { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.estrat.fabricar { background: color-mix(in srgb, var(--bm) 20%, transparent); color: var(--bm); }
+.estrat.segurar { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
+.resumo.grande b { font-size: 1.25rem; }
+
 /* Previsão no topo */
 .previsao { margin: 10px 0 4px; }
 .previsao h2 { font-size: .95rem; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
@@ -268,6 +282,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <button class="aba" data-aba="ciclos" aria-pressed="false">Ciclos semanais</button>
     <button class="aba" data-aba="fabricar" aria-pressed="false">Oportunidades de fabricação</button>
     <button class="aba" data-aba="longo" aria-pressed="false">Previsão 7 dias / 4 semanas</button>
+    <button class="aba" data-aba="calc" aria-pressed="false">Minha calculadora</button>
     <button class="aba bm" data-aba="negro" aria-pressed="false">Mercado Negro</button>
   </div>
   <p class="explica" id="explica"></p>
@@ -395,6 +410,9 @@ const ABAS = {
   },
   longo: {
     texto: "Previsão do preço médio para os próximos 7 dias (modelo LightGBM validado) e projeção até 4 semanas (estatística, ainda não validada).",
+  },
+  calc: {
+    texto: "Informe quanta prata você tem e suas preferências: o site monta uma carteira com revenda entre cidades, fabricação e itens para segurar 7 dias, respeitando a sua prata e quanto o mercado aguenta vender.",
   },
   negro: {
     texto: "Os 5 itens mais em alta no Mercado Negro (Caerleon): o que os NPCs estão comprando acima do normal nas últimas 24h.",
@@ -752,11 +770,14 @@ function desenhar() {
   const ciclosAba = estado.aba === "ciclos";
   $("ciclos-ctrl").hidden = !ciclosAba;
   $("longo-ctrl").hidden = estado.aba !== "longo";
+  document.querySelector(".filtros").hidden = estado.aba === "calc";
+  document.querySelector(".chips-linha").hidden = estado.aba === "calc";
   $("recente").hidden = ciclosAba || comparar || ["fabricar", "longo"].includes(estado.aba);
   if (comparar) return desenharComparacao();
   if (ciclosAba) return desenharCiclos();
   if (estado.aba === "fabricar") return desenharOportunidades();
   if (estado.aba === "longo") return desenharLongo();
+  if (estado.aba === "calc") return desenharCalc();
   if (estado.busca) return desenharBusca();
   if (negro) return desenharNegro();
 
@@ -1120,6 +1141,138 @@ function graficoLongo(d) {
     <line class="agora" x1="${x(t7)}" x2="${x(t7)}" y1="${topo}" y2="${base}"/>
     <text class="rotulo" x="${x(d.ts) + 4}" y="${topo + 10}">agora</text>
     <text class="rotulo" x="${x(t7) + 4}" y="${topo + 10}">+7 dias</text>${eixoX}</svg></div>`;
+}
+
+/* ---------- minha calculadora ---------- */
+const CALC_PADRAO = {prata: "1m", premium: true, taxaEstacao: 500, maxFatia: "0.25",
+                     revenda: true, fabricar: true, segurar: true, comprarEm: "", tierMin: "0"};
+function lerCalc() {
+  try { return {...CALC_PADRAO, ...JSON.parse(ler("calc") || "{}")}; } catch (e) { return {...CALC_PADRAO}; }
+}
+
+// Aceita "1.5m", "500k", "2kk", "1.000.000", "750 mil", "2 milhões"
+function lerPrata(txt) {
+  const t = String(txt).toLowerCase().replace(/\s/g, "").replace(/milh(ões|oes|ão|ao)/, "m").replace(/mil$/, "k");
+  const m = t.match(/^([\d.,]+)(kk|k|m|b)?$/);
+  if (!m) return null;
+  let n = m[1];
+  // "1.000.000" (pontos de milhar) x "1.5" (decimal)
+  n = /^\d{1,3}(\.\d{3})+$/.test(n) ? n.replace(/\./g, "") : n.replace(",", ".");
+  const mult = {k: 1e3, kk: 1e6, m: 1e6, b: 1e9}[m[2]] || 1;
+  const v = parseFloat(n) * mult;
+  return isFinite(v) && v > 0 ? Math.round(v) : null;
+}
+
+function formCalc() {
+  const c = lerCalc();
+  const cidades = estado.cidades.filter(x => x.id !== MERCADO_NEGRO);
+  return `<div class="painel">
+    <h3>Minha prata e minhas preferências</h3>
+    <div class="calc-form">
+      <label>Prata disponível
+        <input type="text" id="calc-prata" value="${esc(c.prata)}" placeholder="ex.: 2m, 500k, 1.000.000" inputmode="decimal">
+        <span class="tag" id="calc-prata-lida"></span></label>
+      <label>Máximo por item
+        <select id="calc-fatia">${[["0.1", "10% da prata"], ["0.25", "25% da prata"], ["0.5", "50% da prata"], ["1", "Sem limite"]].map(([v, t]) => `<option value="${v}" ${c.maxFatia === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      <label>Comprar só em
+        <select id="calc-cidade"><option value="">Qualquer cidade</option>${cidades.map(x => `<option value="${x.id}" ${String(c.comprarEm) === String(x.id) ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select></label>
+      <label>Tier mínimo
+        <select id="calc-tier">${[0, 2, 3, 4, 5, 6, 7, 8].map(t => `<option value="${t}" ${String(c.tierMin) === String(t) ? "selected" : ""}>${t ? "T" + t + " ou maior" : "Qualquer tier"}</option>`).join("")}</select></label>
+      <label>Taxa da estação de fabricação
+        <input type="number" id="calc-estacao" min="0" step="50" value="${c.taxaEstacao}"><span class="tag">prata por 100 de nutrição</span></label>
+      <div class="grupo-check">
+        <span class="tag">Estratégias</span>
+        <label class="linha-check"><input type="checkbox" id="calc-revenda" ${c.revenda ? "checked" : ""}> Revenda entre cidades</label>
+        <label class="linha-check"><input type="checkbox" id="calc-fabricar" ${c.fabricar ? "checked" : ""}> Fabricar e vender</label>
+        <label class="linha-check"><input type="checkbox" id="calc-segurar" ${c.segurar ? "checked" : ""}> Comprar e segurar 7 dias</label>
+      </div>
+      <div class="grupo-check">
+        <span class="tag">Conta</span>
+        <label class="linha-check"><input type="checkbox" id="calc-premium" ${c.premium ? "checked" : ""}> Tenho premium (imposto de 4% em vez de 8%)</label>
+      </div>
+    </div>
+    <div class="calc-acoes">
+      <button class="botao primario" id="calc-botao">Calcular</button>
+      <span class="sub" id="calc-status"></span>
+    </div>
+  </div>
+  <div id="calc-resultado"></div>`;
+}
+
+function salvarCalc() {
+  const c = {
+    prata: $("calc-prata").value, premium: $("calc-premium").checked,
+    taxaEstacao: Number($("calc-estacao").value) || 0, maxFatia: $("calc-fatia").value,
+    revenda: $("calc-revenda").checked, fabricar: $("calc-fabricar").checked, segurar: $("calc-segurar").checked,
+    comprarEm: $("calc-cidade").value, tierMin: $("calc-tier").value,
+  };
+  guardar("calc", JSON.stringify(c));
+  return c;
+}
+
+const NOME_ESTRAT = {revenda: "Revenda", fabricar: "Fabricar", segurar: "Segurar 7d"};
+const NOME_CONF = {"média": "média", "baixa": "baixa (previsão)"};
+
+function tabelaPlanos(planos, comPessimista) {
+  return `<div class="tabela"><table>
+    <thead><tr><th>#</th><th>Estratégia</th><th>Item</th><th>Qtd.</th><th>Comprar em</th><th>Vender em</th><th>Preço un.</th><th>Investir</th><th>Lucro estimado</th><th>Retorno</th><th>Prazo</th></tr></thead>
+    <tbody>${planos.map((p, n) => `<tr data-id="${esc(p.item)}" title="${esc(p.detalhe)}">
+      <td class="pos num">${n + 1}</td>
+      <td><span class="estrat ${p.tipo}">${NOME_ESTRAT[p.tipo]}</span></td>
+      <td><div class="item"><img loading="lazy" src="${icone(p.item)}" alt=""><div><b>${esc(p.nome)}</b><div class="tag">${tierTxt(p)} · ${esc(p.detalhe)}</div></div></div></td>
+      <td class="num">${fmt(p.qtd)}${p.limitado_por === "liquidez" ? `<div class="tag">limite do mercado</div>` : ""}</td>
+      <td>${esc(p.compra)}</td><td>${esc(p.venda)}</td>
+      <td class="num">${fmt(p.preco_compra)}</td>
+      <td class="num">${fmtCurto(p.investimento)}</td>
+      <td class="num"><b class="up">+${fmtCurto(p.lucro)}</b>${comPessimista && p.lucro_pessimista != null ? `<div class="tag">pior caso: ${p.lucro_pessimista >= 0 ? "+" : ""}${fmtCurto(p.lucro_pessimista)}</div>` : ""}</td>
+      <td class="num">${(p.roi * 100).toLocaleString("pt-BR", {maximumFractionDigits: 0})}%</td>
+      <td>${esc(p.prazo)}<div class="tag">confiança ${NOME_CONF[p.confianca] || p.confianca}</div></td></tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
+async function calcular() {
+  const c = salvarCalc();
+  const prata = lerPrata(c.prata);
+  if (!prata) { $("calc-status").textContent = "Não entendi o valor da prata. Exemplos: 2m, 500k, 1.000.000."; return; }
+  const estrategias = ["revenda", "fabricar", "segurar"].filter(e => c[e]);
+  if (!estrategias.length) { $("calc-status").textContent = "Escolha pelo menos uma estratégia."; return; }
+  $("calc-status").textContent = "Calculando… (a primeira vez pode levar ~30 s)";
+  $("calc-botao").disabled = true;
+  const q = new URLSearchParams({regiao: estado.regiao, prata, premium: c.premium, taxa_estacao: c.taxaEstacao,
+    max_fatia: c.maxFatia, estrategias: estrategias.join(","), tier_min: c.tierMin});
+  if (c.comprarEm) q.set("comprar_em", c.comprarEm);
+  let d;
+  try { d = await obter(`/api/v1/calculadora?${q}`); }
+  catch (e) { $("calc-status").textContent = "Não foi possível calcular agora. Tente de novo em instantes."; $("calc-botao").disabled = false; return; }
+  $("calc-botao").disabled = false;
+  $("calc-status").textContent = `${d.total_planos.toLocaleString("pt-BR")} possibilidades analisadas · taxa de venda ${(d.taxa_venda * 100).toLocaleString("pt-BR")}%`;
+  const r = d.carteira_resumo;
+  const retorno = r.investido ? r.lucro / r.investido : 0;
+  $("calc-resultado").innerHTML = d.carteira.length ? `
+    <h3 style="margin-top:18px">O que fazer com ${fmtCurto(d.prata)} de prata</h3>
+    <div class="resumo grande">
+      <div><span>Investir</span><b>${fmtCurto(r.investido)}</b></div>
+      <div><span>Sobra</span><b>${fmtCurto(r.sobra)}</b></div>
+      <div><span>Lucro estimado</span><b class="up">+${fmtCurto(r.lucro)}</b></div>
+      <div><span>Retorno sobre o investido</span><b>${(retorno * 100).toLocaleString("pt-BR", {maximumFractionDigits: 0})}%</b></div>
+    </div>
+    ${tabelaPlanos(d.carteira, true)}
+    <p class="sub">Preços conservadores: compra pelo maior e venda pelo menor entre o preço atual e a média de 14 dias, já com as taxas de venda${$("calc-fabricar").checked ? " e a taxa da estação" : ""}. A quantidade nunca passa de 20% do que o item vende por dia no destino ("limite do mercado"). Não inclui risco de transporte, peso da montaria nem a disputa com outros jogadores pelas mesmas ordens: confira os preços no jogo antes de investir. "Segurar 7d" usa a previsão do modelo (acerta a direção ~62% das vezes) e mostra o pior caso da faixa de 80%.</p>
+    <h3>Outras ideias (maior lucro com a sua prata)</h3>
+    ${tabelaPlanos(d.planos.filter(p => !d.carteira.some(x => x.item === p.item && x.tipo === p.tipo)).slice(0, LIMITE), true)}`
+    : `<div class="vazio">Nenhuma oportunidade com lucro para esses filtros. Tente outras estratégias, outra cidade de compra ou um tier mínimo menor.</div>`;
+}
+
+function desenharCalc() {
+  $("explica").textContent = ABAS.calc.texto;
+  if (!$("calc-prata")) {
+    $("conteudo").innerHTML = formCalc();
+    const mostrar = () => { const v = lerPrata($("calc-prata").value); $("calc-prata-lida").textContent = v ? `= ${fmt(v)} de prata` : "valor não reconhecido"; };
+    $("calc-prata").addEventListener("input", mostrar);
+    $("calc-prata").addEventListener("keydown", e => { if (e.key === "Enter") calcular(); });
+    $("calc-botao").addEventListener("click", calcular);
+    mostrar();
+  }
 }
 
 /* ---------- ciclos semanais ---------- */
